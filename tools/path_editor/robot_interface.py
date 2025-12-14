@@ -2,6 +2,7 @@
 """
 Robot Mission Interface
 Interface for the robot to retrieve and process mission data from the backend server
+Uses unified ChipuRobot system for hardware control
 """
 
 import requests
@@ -9,6 +10,15 @@ import json
 import time
 from typing import Dict, List, Optional, Tuple
 import math
+
+# Import unified robot system
+try:
+    from chipurobo_unified import ChipuRobot, GPIOPinManager
+    ROBOT_SYSTEM_AVAILABLE = True
+    print("✅ ChipuRobot unified system available")
+except ImportError as e:
+    print(f"⚠️ ChipuRobot system not available: {e}")
+    ROBOT_SYSTEM_AVAILABLE = False
 
 class RobotMissionInterface:
     def __init__(self, server_ip: str = "localhost", server_port: int = 5001):
@@ -187,33 +197,99 @@ class RobotMissionInterface:
         print(f"   Ready for Execution: {'✅ YES' if summary['ready_for_execution'] else '❌ NO'}")
         
         return summary
+    
+    def execute_with_robot(self) -> bool:
+        """Execute current mission using unified ChipuRobot system"""
+        if not ROBOT_SYSTEM_AVAILABLE:
+            print("❌ ChipuRobot system not available")
+            return False
+        
+        # Get mission data
+        summary = self.get_mission_summary()
+        if not summary.get('ready_for_execution'):
+            print("❌ Mission not ready for execution")
+            return False
+        
+        try:
+            # Initialize robot with config from server
+            config = summary.get('robot_config', {})
+            robot_config = {
+                'wheelDiameter': config.get('wheelDiameter', 4.0),
+                'wheelBase': config.get('wheelbase', 12.0),
+                'encoderPPR': 11,  # Standard for DC motors with encoders
+                'pwmFreq': config.get('pwmFreq', 1000)
+            }
+            
+            robot = ChipuRobot(robot_config)
+            
+            # Execute the mission
+            print("🚀 Starting mission execution...")
+            robot.execute_mission(self.current_mission)
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Mission execution failed: {e}")
+            return False
+        finally:
+            try:
+                robot.cleanup()
+            except:
+                pass
 
 def main():
-    """Example usage of the robot mission interface"""
-    print("🤖 ChipuRobo Mission Interface")
+    """Interactive robot mission interface"""
+    print("🤖 ChipuRobot Mission Interface")
     print("=" * 40)
     
     # Create interface instance
-    robot = RobotMissionInterface()
+    robot_interface = RobotMissionInterface()
     
     # Get mission summary
-    summary = robot.get_mission_summary()
+    summary = robot_interface.get_mission_summary()
     
     if summary.get('ready_for_execution'):
-        print("\n🎯 Getting detailed mission data...")
-        waypoints = robot.get_waypoints()
+        print("\n🎯 Mission ready for execution!")
         
-        if waypoints:
-            print("\n📈 Generating trajectory...")
-            trajectory = robot.generate_trajectory(waypoints)
+        if ROBOT_SYSTEM_AVAILABLE:
+            print("\nOptions:")
+            print("1. Execute mission on this robot")
+            print("2. Just show mission data") 
+            print("3. Exit")
             
-            if trajectory:
-                print("\n✅ Mission data ready for robot execution!")
-                print("   Use the trajectory data to control robot movement.")
-            else:
-                print("\n⚠️ Could not generate trajectory.")
+            try:
+                choice = input("\nEnter your choice (1-3): ").strip()
+                
+                if choice == '1':
+                    print("\n🚀 Executing mission on robot hardware...")
+                    success = robot_interface.execute_with_robot()
+                    if success:
+                        print("✅ Mission execution completed!")
+                    else:
+                        print("❌ Mission execution failed!")
+                        
+                elif choice == '2':
+                    print("\n📊 Mission Data:")
+                    waypoints = robot_interface.get_waypoints()
+                    trajectory = robot_interface.generate_trajectory(waypoints)
+                    if trajectory:
+                        print(f"   {len(trajectory)} trajectory points generated")
+                    
+                elif choice == '3':
+                    print("👋 Goodbye!")
+                    
+                else:
+                    print("❌ Invalid choice")
+                    
+            except KeyboardInterrupt:
+                print("\n👋 Interrupted by user")
         else:
-            print("\n⚠️ No waypoints available.")
+            print("\n⚠️ Robot hardware system not available")
+            print("   Can only display mission data")
+            
+            waypoints = robot_interface.get_waypoints()
+            trajectory = robot_interface.generate_trajectory(waypoints)
+            
     else:
         print("\n⚠️ Mission not ready for execution.")
         print("   Deploy a mission from the web interface first.")

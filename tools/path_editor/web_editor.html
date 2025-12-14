@@ -211,7 +211,9 @@
                 </div>
                 
                 <button class="save-btn" onclick="deployToRobot()">🚀 Deploy to Robot</button>
-                <button class="load-btn" onclick="saveConfig()">💾 Save Config</button>
+                <button class="load-btn" onclick="executeOnRobot()">▶️ Execute Mission</button>
+                <button class="clear-btn" onclick="stopRobot()">⏹️ Stop Robot</button>
+                <button class="field-btn" onclick="saveConfig()">💾 Save Config</button>
                 <button class="field-btn" onclick="loadConfig()">📁 Load Config</button>
             </div>
             
@@ -772,7 +774,8 @@
                     });
                 })
                 .then(response => {
-                    if (response) return response.json();
+                    if (response && response.ok) return response.json();
+                    throw new Error(`Deployment failed: HTTP ${response ? response.status : 'no response'}`);
                 })
                 .then(data => {
                     if (data) {
@@ -868,6 +871,105 @@
             };
             
             input.click();
+        }
+
+        function executeOnRobot() {
+            const robotIP = document.getElementById('robotIP').value;
+            
+            status.textContent = 'Starting mission execution on robot...';
+            status.style.color = '#ff9800';
+            
+            fetch(`http://${robotIP}:5001/mission/execute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    status.style.color = '#4caf50';
+                    status.textContent = `▶️ Mission execution started! Mission ID: ${data.missionId}`;
+                    
+                    // Start monitoring robot status
+                    startRobotStatusMonitoring();
+                } else {
+                    status.style.color = '#f44336';
+                    status.textContent = `❌ Execution failed: ${data.message}`;
+                }
+            })
+            .catch(error => {
+                status.style.color = '#f44336';
+                status.textContent = `❌ Execution failed: ${error.message}`;
+            });
+        }
+        
+        function stopRobot() {
+            const robotIP = document.getElementById('robotIP').value;
+            
+            status.textContent = 'Stopping robot...';
+            status.style.color = '#ff9800';
+            
+            fetch(`http://${robotIP}:5001/mission/stop`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    status.style.color = '#4caf50';
+                    status.textContent = '⏹️ Robot stopped successfully!';
+                    stopRobotStatusMonitoring();
+                } else {
+                    status.style.color = '#f44336';
+                    status.textContent = `❌ Stop failed: ${data.message}`;
+                }
+            })
+            .catch(error => {
+                status.style.color = '#f44336';
+                status.textContent = `❌ Stop failed: ${error.message}`;
+            });
+        }
+        
+        let robotStatusInterval;
+        
+        function startRobotStatusMonitoring() {
+            if (robotStatusInterval) return;
+            
+            const robotIP = document.getElementById('robotIP').value;
+            
+            robotStatusInterval = setInterval(() => {
+                fetch(`http://${robotIP}:5001/robot/status`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.robot_status) {
+                        const robotStatus = data.robot_status;
+                        const pos = robotStatus.position;
+                        
+                        // Update status with robot position
+                        if (robotStatus.mission_running) {
+                            status.style.color = '#4caf50';
+                            status.textContent = `🤖 Mission running - Position: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ft, Heading: ${pos.heading.toFixed(1)}°`;
+                        } else {
+                            status.style.color = '#666';
+                            status.textContent = `🤖 Mission complete - Final position: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ft`;
+                            stopRobotStatusMonitoring();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Status monitoring error:', error);
+                });
+            }, 250); // Update every 250ms for smoother feedback
+        }
+        
+        function stopRobotStatusMonitoring() {
+            if (robotStatusInterval) {
+                clearInterval(robotStatusInterval);
+                robotStatusInterval = null;
+            }
         }
 
         // Initialize field
