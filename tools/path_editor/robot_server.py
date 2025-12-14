@@ -265,11 +265,11 @@ def get_robot_status():
                 'imu': sensor_data['imu'],
                 'mission_running': mission_thread is not None and mission_thread.is_alive(),
                 'capabilities': {
-                    'motors': robot_instance.motor_driver.initialized or not RPI_AVAILABLE,
-                    'left_encoder': robot_instance.left_encoder.active or not RPI_AVAILABLE,
-                    'right_encoder': robot_instance.right_encoder.active or not RPI_AVAILABLE,
-                    'imu': robot_instance.imu.available or not RPI_AVAILABLE,
-                    'vision': robot_instance.vision.available or not RPI_AVAILABLE
+                    'motors': robot_instance.motor_driver.initialized,
+                    'left_encoder': robot_instance.left_encoder.active,
+                    'right_encoder': robot_instance.right_encoder.active,
+                    'imu': robot_instance.imu.available,
+                    'vision': robot_instance.vision.available
                 }
             }
         })
