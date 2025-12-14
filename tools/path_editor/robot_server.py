@@ -29,17 +29,64 @@ CONFIG_DIR.mkdir(exist_ok=True)
 current_mission = None
 current_config = None
 
+def check_raspberry_pi_hardware():
+    """Check if running on Raspberry Pi with GPIO access"""
+    hardware_status = {
+        'is_raspberry_pi': False,
+        'gpio_available': False,
+        'platform': 'unknown',
+        'gpio_error': None
+    }
+    
+    # Check if running on Raspberry Pi
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            cpuinfo = f.read().lower()
+            if 'raspberry pi' in cpuinfo:
+                hardware_status['is_raspberry_pi'] = True
+                hardware_status['platform'] = 'Raspberry Pi'
+    except:
+        # Not on Linux or can't read cpuinfo
+        import platform
+        hardware_status['platform'] = platform.system()
+    
+    # Check GPIO availability
+    if hardware_status['is_raspberry_pi']:
+        try:
+            import RPi.GPIO as GPIO
+            # Try to set GPIO mode (doesn't actually configure pins)
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            hardware_status['gpio_available'] = True
+        except ImportError:
+            hardware_status['gpio_error'] = 'RPi.GPIO not installed'
+        except Exception as e:
+            hardware_status['gpio_error'] = str(e)
+    else:
+        hardware_status['gpio_error'] = 'Not running on Raspberry Pi'
+    
+    return hardware_status
+
 @app.route('/status', methods=['GET'])
 def get_status():
-    """Get robot server status"""
+    """Get robot server status with hardware detection"""
+    hardware = check_raspberry_pi_hardware()
+    
     return jsonify({
         'status': 'online',
         'server': 'ChipuRobo Mission Control',
         'version': '1.0',
         'timestamp': datetime.datetime.now().isoformat(),
         'missions_stored': len(list(MISSIONS_DIR.glob('*.json'))),
-        'current_mission': current_mission is not None
+        'current_mission': current_mission is not None,
+        'hardware': hardware,
+        'robot_ready': hardware['is_raspberry_pi'] and hardware['gpio_available']
     })
+
+@app.route('/hardware', methods=['GET'])
+def get_hardware_status():
+    """Dedicated endpoint for hardware status check"""
+    return jsonify(check_raspberry_pi_hardware())
 
 @app.route('/deploy', methods=['POST'])
 def deploy_mission():

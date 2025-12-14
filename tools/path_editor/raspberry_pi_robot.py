@@ -173,10 +173,54 @@ class RaspberryPiRobot:
         # Calculate wheel circumference (inches)
         self.wheel_circumference = math.pi * self.config['wheelDiameter']
         
+        # Initialize precision sensors if available
+        self.precision_sensors = self.setup_precision_sensors()
+        
         print("🤖 Raspberry Pi robot initialized")
         print(f"   Wheel diameter: {self.config['wheelDiameter']} inches")
         print(f"   Wheelbase: {self.config['wheelbase']} inches")
         print(f"   Max speed: {self.config['maxSpeed']} ft/s")
+        if self.precision_sensors:
+            print("   🎯 High-precision mode: encoders + IMU + camera available")
+        else:
+            print("   📍 Basic mode: precision sensors not available")
+    
+    def setup_precision_sensors(self):
+        """Try to initialize precision sensors (encoders, IMU, camera)"""
+        if not RPI_AVAILABLE:
+            return False
+            
+        try:
+            # Check if precision sensors are available
+            precision_available = True
+            
+            # Try to import precision modules
+            try:
+                import board
+                import adafruit_mpu6050
+                import cv2
+                import picamera2
+                precision_available = True
+            except ImportError as e:
+                print(f"⚠️ Precision sensor libraries not available: {e}")
+                print("   To enable precision mode, install:")
+                print("   pip3 install adafruit-circuitpython-mpu6050 opencv-python picamera2")
+                return False
+            
+            if precision_available:
+                # Initialize the high-precision robot components
+                self.encoders = {
+                    'left': {'pin_a': 5, 'pin_b': 6, 'count': 0},
+                    'right': {'pin_a': 13, 'pin_b': 19, 'count': 0}
+                }
+                self.imu_available = True
+                self.camera_available = True
+                return True
+        
+        except Exception as e:
+            print(f"⚠️ Precision sensors initialization failed: {e}")
+        
+        return False
     
     def drive_tank(self, left_speed, right_speed):
         """

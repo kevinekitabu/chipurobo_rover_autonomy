@@ -671,66 +671,119 @@
         // Robot configuration functions
         function testConnection() {
             const robotIP = document.getElementById('robotIP').value;
-            status.textContent = 'Testing connection to robot...';
+            const serverURL = `http://${robotIP}:5001`;
             
-            // Test connection to robot backend
-            fetch(`http://${robotIP}:5001/status`)
-                .then(response => response.json())
+            status.textContent = 'Testing robot status...';
+            
+            fetch(`${serverURL}/status`, {method: 'GET'})
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    status.textContent = `✅ Connected to robot! Status: ${data.status}`;
+                    const hardware = data.hardware || {};
+                    const robotReady = data.robot_ready || false;
+                    
+                    if (robotReady) {
+                        status.style.color = '#4caf50';
+                        status.textContent = `✅ Robot Ready! Running on ${hardware.platform} with GPIO access (${data.missions_stored || 0} missions stored)`;
+                    } else if (hardware.is_raspberry_pi) {
+                        status.style.color = '#ff9800';
+                        status.textContent = `⚠️ Raspberry Pi detected but GPIO issue: ${hardware.gpio_error || 'Unknown error'}`;
+                    } else {
+                        status.style.color = '#f44336';
+                        status.textContent = `❌ Not a robot! Running on ${hardware.platform} - Deploy to Raspberry Pi for robot control`;
+                    }
+                    
+                    // Update deploy button state
+                    const deployBtn = document.querySelector('button[onclick="deployToRobot()"]');
+                    if (deployBtn) {
+                        deployBtn.disabled = !robotReady;
+                        deployBtn.title = robotReady ? 'Deploy mission to robot' : 'Robot hardware not available';
+                        deployBtn.style.opacity = robotReady ? '1' : '0.5';
+                    }
                 })
                 .catch(error => {
-                    status.textContent = `❌ Connection failed: ${error.message}. Check robot IP and ensure robot server is running.`;
+                    status.style.color = '#f44336';
+                    status.textContent = `❌ Server connection failed: ${error.message}`;
                 });
         }
         
         function deployToRobot() {
             const robotIP = document.getElementById('robotIP').value;
             
-            const deployData = {
-                field: {
-                    dimensions: { width: fieldWidth, height: fieldHeight },
-                    elements: fieldElements,
-                    pixelsPerFoot: pixelsPerFoot
-                },
-                path: {
-                    waypoints: waypoints.map(wp => {
-                        const fieldX = (wp.x - 20) / pixelsPerFoot;
-                        const fieldY = fieldHeight - (wp.y - 20) / pixelsPerFoot;
-                        return { x: fieldX, y: fieldY };
-                    })
-                },
-                robotConfig: {
-                    length: parseFloat(document.getElementById('robotLength').value),
-                    width: parseFloat(document.getElementById('robotWidth').value),
-                    wheelDiameter: parseFloat(document.getElementById('wheelDiameter').value),
-                    wheelbase: parseFloat(document.getElementById('wheelbase').value),
-                    maxSpeed: parseFloat(document.getElementById('maxSpeed').value),
-                    maxAccel: parseFloat(document.getElementById('maxAccel').value),
-                    pwmFreq: parseFloat(document.getElementById('pwmFreq').value),
-                    platform: 'raspberry_pi',
-                    motorDriver: 'l298n',
-                    sshUser: document.getElementById('sshUser').value
-                },
-                timestamp: new Date().toISOString()
-            };
+            // First check if robot hardware is ready
+            status.textContent = 'Checking robot status before deployment...';
             
-            status.textContent = 'Deploying to robot...';
-            
-            fetch(`http://${robotIP}:5001/deploy`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(deployData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                status.textContent = `🚀 Successfully deployed to robot! Mission ID: ${data.missionId}`;
-            })
-            .catch(error => {
-                status.textContent = `❌ Deployment failed: ${error.message}. Check connection and try again.`;
-            });
+            fetch(`http://${robotIP}:5001/status`)
+                .then(response => response.json())
+                .then(statusData => {
+                    if (!statusData.robot_ready) {
+                        const hardware = statusData.hardware || {};
+                        if (hardware.is_raspberry_pi) {
+                            status.style.color = '#ff9800';
+                            status.textContent = `⚠️ Cannot deploy: GPIO error on Pi - ${hardware.gpio_error}`;
+                        } else {
+                            status.style.color = '#f44336';
+                            status.textContent = `❌ Cannot deploy: Not running on Raspberry Pi (detected: ${hardware.platform})`;
+                        }
+                        return;
+                    }
+                    
+                    // Robot is ready, proceed with deployment
+                    const deployData = {
+                        field: {
+                            dimensions: { width: fieldWidth, height: fieldHeight },
+                            elements: fieldElements,
+                            pixelsPerFoot: pixelsPerFoot
+                        },
+                        path: {
+                            waypoints: waypoints.map(wp => {
+                                const fieldX = (wp.x - 20) / pixelsPerFoot;
+                                const fieldY = fieldHeight - (wp.y - 20) / pixelsPerFoot;
+                                return { x: fieldX, y: fieldY };
+                            })
+                        },
+                        robotConfig: {
+                            length: parseFloat(document.getElementById('robotLength').value),
+                            width: parseFloat(document.getElementById('robotWidth').value),
+                            wheelDiameter: parseFloat(document.getElementById('wheelDiameter').value),
+                            wheelbase: parseFloat(document.getElementById('wheelbase').value),
+                            maxSpeed: parseFloat(document.getElementById('maxSpeed').value),
+                            maxAccel: parseFloat(document.getElementById('maxAccel').value),
+                            pwmFreq: parseFloat(document.getElementById('pwmFreq').value),
+                            platform: 'raspberry_pi',
+                            motorDriver: 'l298n',
+                            sshUser: document.getElementById('sshUser').value
+                        },
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    status.textContent = 'Deploying mission to robot...';
+                    
+                    return fetch(`http://${robotIP}:5001/deploy`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(deployData)
+                    });
+                })
+                .then(response => {
+                    if (response) return response.json();
+                })
+                .then(data => {
+                    if (data) {
+                        status.style.color = '#4caf50';
+                        status.textContent = `🚀 Mission deployed successfully! Mission ID: ${data.missionId}`;
+                    }
+                })
+                .catch(error => {
+                    status.style.color = '#f44336';
+                    status.textContent = `❌ Deployment failed: ${error.message}`;
+                });
         }
         
         function saveConfig() {
