@@ -1,0 +1,90 @@
+# ChipuRobo Project .gitignore
+
+# Curriculum - Keep private/local only
+curriculum/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Config files with sensitive data
+config/secrets.toml
+.env.local
+.env.production
+
+# Raspberry Pi specific
+*.img
+*.zip
+
+# 3D Printing files (large)
+*.stl
+*.gcode
+*.3mf
+
+# CAD backup files
+*.bak
+*.dwl
+*.dwl2
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
