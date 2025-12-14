@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """
 ChipuRobo Mission Control Backend Server
-Receives field configurations, paths, and robot settings from the web interface
-Provides API for robot to retrieve mission data
+Professional Flask-based mission control server
 """
+
+import sys
+from pathlib import Path
+
+# Add chipurobo package to path
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 import os
 import datetime
-from pathlib import Path
 import threading
 import time
+import signal
 
 # Import unified robot system
 try:
-    from chipurobo_unified import ChipuRobot, GPIOPinManager, RPI_AVAILABLE
+    from chipurobo.hardware.robot import ChipuRobot
+    from chipurobo.hardware.gpio_manager import GPIOPinManager
     ROBOT_AVAILABLE = True
-    print("✅ ChipuRobot unified system available")
+    print("✅ ChipuRobo unified system available")
 except ImportError as e:
     print(f"⚠️ ChipuRobot not available: {e}")
     ROBOT_AVAILABLE = False
@@ -27,7 +34,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for web interface
 
 # Data storage directories
-DATA_DIR = Path(__file__).parent / "robot_data"
+DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 MISSIONS_DIR = DATA_DIR / "missions"
@@ -42,7 +49,7 @@ current_config = None
 robot_instance = None
 mission_thread = None
 
-def check_raspberry_pi_hardware():
+def check_hardware_status():
     """Check hardware availability using unified robot system"""
     hardware_status = {
         'is_raspberry_pi': False,
@@ -50,7 +57,6 @@ def check_raspberry_pi_hardware():
         'platform': 'unknown',
         'gpio_error': None,
         'robot_available': ROBOT_AVAILABLE,
-        'rpi_available': RPI_AVAILABLE if ROBOT_AVAILABLE else False,
         'pin_assignments': {}
     }
     
@@ -68,11 +74,13 @@ def check_raspberry_pi_hardware():
     
     # Check robot system availability
     if ROBOT_AVAILABLE:
-        hardware_status['gpio_available'] = RPI_AVAILABLE
-        hardware_status['pin_assignments'] = GPIOPinManager.PINS
-        
-        if not RPI_AVAILABLE:
+        try:
+            import RPi.GPIO as GPIO
+            hardware_status['gpio_available'] = True
+        except ImportError:
             hardware_status['gpio_error'] = 'RPi.GPIO not available - simulation mode'
+        
+        hardware_status['pin_assignments'] = GPIOPinManager.PINS
     else:
         hardware_status['gpio_error'] = 'ChipuRobot system not available'
     
@@ -101,15 +109,15 @@ def initialize_robot():
         print(f"❌ Robot initialization failed: {e}")
         return False
 
-@app.route('/status', methods=['GET'])
+@app.route('/api/status', methods=['GET'])
 def get_status():
     """Get robot server status with hardware detection"""
-    hardware = check_raspberry_pi_hardware()
+    hardware = check_hardware_status()
     
     return jsonify({
         'status': 'online',
         'server': 'ChipuRobo Mission Control',
-        'version': '1.0',
+        'version': '1.0.0',
         'timestamp': datetime.datetime.now().isoformat(),
         'missions_stored': len(list(MISSIONS_DIR.glob('*.json'))),
         'current_mission': current_mission is not None,
@@ -117,12 +125,15 @@ def get_status():
         'robot_ready': hardware['is_raspberry_pi'] and hardware['gpio_available']
     })
 
-@app.route('/hardware', methods=['GET'])
+@app.route('/api/hardware', methods=['GET'])
 def get_hardware_status():
-    """Dedicated endpoint for hardware status check"""
-    return jsonify(check_raspberry_pi_hardware())
+    """Detailed hardware status endpoint"""
+    if robot_instance:
+        return jsonify(robot_instance.get_system_status())
+    else:
+        return jsonify(check_hardware_status())
 
-@app.route('/deploy', methods=['POST'])
+@app.route('/api/mission/deploy', methods=['POST'])
 def deploy_mission():
     """Deploy field, path, and robot config from web interface"""
     global current_mission
@@ -183,8 +194,9 @@ def execute_mission_thread(mission_data):
         print(f"❌ Mission execution error: {e}")
     finally:
         mission_thread = None
+        print("🏁 Mission execution thread completed")
 
-@app.route('/mission/execute', methods=['POST'])
+@app.route('/api/mission/execute', methods=['POST'])
 def execute_current_mission():
     """Execute the current mission on the robot hardware"""
     global mission_thread
@@ -209,8 +221,11 @@ def execute_current_mission():
     
     try:
         # Start mission execution in background thread
-        mission_thread = threading.Thread(target=execute_mission_thread, args=(current_mission,))
-        mission_thread.daemon = True
+        mission_thread = threading.Thread(
+            target=execute_mission_thread, 
+            args=(current_mission,),
+            name="MissionExecutor"
+        )
         mission_thread.start()
         
         return jsonify({
@@ -225,7 +240,7 @@ def execute_current_mission():
             'error': str(e)
         }), 500
 
-@app.route('/mission/stop', methods=['POST'])
+@app.route('/api/mission/stop', methods=['POST'])
 def stop_mission():
     """Stop current mission execution"""
     global robot_instance
@@ -243,7 +258,7 @@ def stop_mission():
             'message': 'No robot instance available'
         }), 404
 
-@app.route('/robot/status', methods=['GET'])
+@app.route('/api/robot/status', methods=['GET'])
 def get_robot_status():
     """Get real-time robot sensor data and status"""
     global robot_instance
@@ -263,13 +278,14 @@ def get_robot_status():
                 'position': sensor_data['position'],
                 'encoders': sensor_data['encoders'],
                 'imu': sensor_data['imu'],
+                'vision': sensor_data['vision'],
                 'mission_running': mission_thread is not None and mission_thread.is_alive(),
                 'capabilities': {
-                    'motors': robot_instance.motor_driver.initialized,
-                    'left_encoder': robot_instance.left_encoder.active,
-                    'right_encoder': robot_instance.right_encoder.active,
-                    'imu': robot_instance.imu.available,
-                    'vision': robot_instance.vision.available
+                    'motors': sensor_data['motor_driver']['initialized'],
+                    'left_encoder': sensor_data['encoders']['left']['active'],
+                    'right_encoder': sensor_data['encoders']['right']['active'],
+                    'imu': sensor_data['imu']['available'],
+                    'vision': sensor_data['vision']['available']
                 }
             }
         })
@@ -280,147 +296,31 @@ def get_robot_status():
             'error': str(e)
         }), 500
 
-@app.route('/mission/current', methods=['GET'])
-def get_current_mission():
-    """Get current mission data for robot"""
-    if current_mission is None:
-        return jsonify({
-            'success': False,
-            'message': 'No mission currently deployed'
-        }), 404
-    
-    return jsonify({
-        'success': True,
-        'mission': current_mission
-    })
+# Legacy endpoints for backward compatibility
+@app.route('/status', methods=['GET'])
+def legacy_status():
+    """Legacy status endpoint"""
+    return get_status()
 
-@app.route('/mission/<mission_id>', methods=['GET'])
-def get_mission(mission_id):
-    """Get specific mission by ID"""
-    mission_file = MISSIONS_DIR / f"{mission_id}.json"
-    
-    if not mission_file.exists():
-        return jsonify({
-            'success': False,
-            'message': f'Mission {mission_id} not found'
-        }), 404
-    
-    with open(mission_file, 'r') as f:
-        mission_data = json.load(f)
-    
-    return jsonify({
-        'success': True,
-        'mission': mission_data
-    })
+@app.route('/deploy', methods=['POST'])
+def legacy_deploy():
+    """Legacy deploy endpoint"""
+    return deploy_mission()
 
-@app.route('/missions', methods=['GET'])
-def list_missions():
-    """List all available missions"""
-    missions = []
-    
-    for mission_file in MISSIONS_DIR.glob('*.json'):
-        try:
-            with open(mission_file, 'r') as f:
-                mission_data = json.load(f)
-                missions.append({
-                    'id': mission_data.get('missionId'),
-                    'timestamp': mission_data.get('timestamp'),
-                    'file': mission_file.name,
-                    'waypoints': len(mission_data.get('path', {}).get('waypoints', [])),
-                    'field_elements': len(mission_data.get('field', {}).get('elements', []))
-                })
-        except Exception as e:
-            print(f"Error reading mission file {mission_file}: {e}")
-    
-    return jsonify({
-        'success': True,
-        'missions': missions
-    })
+@app.route('/mission/execute', methods=['POST'])
+def legacy_execute():
+    """Legacy execute endpoint"""
+    return execute_current_mission()
 
-@app.route('/robot/config', methods=['GET'])
-def get_robot_config():
-    """Get current robot configuration"""
-    config_file = CONFIG_DIR / "current_robot_config.json"
-    
-    if not config_file.exists():
-        return jsonify({
-            'success': False,
-            'message': 'No robot configuration found'
-        }), 404
-    
-    with open(config_file, 'r') as f:
-        config_data = json.load(f)
-    
-    return jsonify({
-        'success': True,
-        'config': config_data
-    })
+@app.route('/mission/stop', methods=['POST'])
+def legacy_stop():
+    """Legacy stop endpoint"""
+    return stop_mission()
 
-@app.route('/path/generate', methods=['POST'])
-def generate_trajectory():
-    """Generate trajectory from waypoints using robot constraints"""
-    try:
-        data = request.json
-        waypoints = data.get('waypoints', [])
-        robot_config = data.get('robotConfig', {})
-        
-        # This is where you'd implement trajectory generation
-        # For now, return the waypoints with timing information
-        
-        max_speed = robot_config.get('maxSpeed', 6.0)  # ft/s
-        max_accel = robot_config.get('maxAccel', 8.0)  # ft/s²
-        
-        trajectory = []
-        total_time = 0.0
-        
-        for i, waypoint in enumerate(waypoints):
-            if i == 0:
-                # Starting point
-                trajectory.append({
-                    'x': waypoint['x'],
-                    'y': waypoint['y'],
-                    'time': 0.0,
-                    'velocity': 0.0,
-                    'heading': 0.0
-                })
-            else:
-                # Calculate distance to previous waypoint
-                prev = waypoints[i-1]
-                dx = waypoint['x'] - prev['x']
-                dy = waypoint['y'] - prev['y']
-                distance = (dx**2 + dy**2)**0.5
-                
-                # Simple time calculation (can be improved with proper trajectory planning)
-                segment_time = distance / (max_speed * 0.8)  # Use 80% of max speed
-                total_time += segment_time
-                
-                # Calculate heading
-                heading = math.atan2(dy, dx) * 180 / math.pi
-                
-                trajectory.append({
-                    'x': waypoint['x'],
-                    'y': waypoint['y'],
-                    'time': total_time,
-                    'velocity': max_speed * 0.8,
-                    'heading': heading
-                })
-        
-        return jsonify({
-            'success': True,
-            'trajectory': trajectory,
-            'total_time': total_time,
-            'total_distance': sum([
-                ((trajectory[i]['x'] - trajectory[i-1]['x'])**2 + 
-                 (trajectory[i]['y'] - trajectory[i-1]['y'])**2)**0.5 
-                for i in range(1, len(trajectory))
-            ])
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
+@app.route('/robot/status', methods=['GET'])
+def legacy_robot_status():
+    """Legacy robot status endpoint"""
+    return get_robot_status()
 
 def cleanup_robot():
     """Clean up robot resources"""
@@ -431,23 +331,22 @@ def cleanup_robot():
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
-    print("\n🛑 Shutdown signal received, cleaning up...")
+    print(f"\n🛑 Shutdown signal {signum} received, cleaning up...")
     cleanup_robot()
     exit(0)
 
 if __name__ == '__main__':
     import math
-    import signal
     
     # Register signal handlers for clean shutdown
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    print("🤖 ChipuRobo Mission Control Backend Server")
+    print("🤖 ChipuRobo Mission Control Backend Server v1.0")
     print(f"📁 Data directory: {DATA_DIR.absolute()}")
     
     # Check hardware status
-    hardware = check_raspberry_pi_hardware()
+    hardware = check_hardware_status()
     print(f"🔧 Platform: {hardware['platform']}")
     print(f"🔌 GPIO Available: {hardware['gpio_available']}")
     print(f"🤖 Robot System: {'✅ Available' if hardware['robot_available'] else '❌ Not Available'}")
@@ -456,10 +355,13 @@ if __name__ == '__main__':
         print(f"⚠️ GPIO Status: {hardware['gpio_error']}")
     
     print(f"🚀 Starting server on http://0.0.0.0:5001")
-    print("   - Web interface: Deploy missions via POST /deploy")
-    print("   - Robot control: Execute missions via POST /mission/execute")
-    print("   - Real-time status: GET /robot/status")
-    print("   - Hardware info: GET /hardware")
+    print("   API Endpoints:")
+    print("   - GET  /api/status           - Server status")
+    print("   - GET  /api/hardware         - Hardware details")
+    print("   - POST /api/mission/deploy   - Deploy mission")
+    print("   - POST /api/mission/execute  - Execute mission")
+    print("   - POST /api/mission/stop     - Stop mission")
+    print("   - GET  /api/robot/status     - Robot telemetry")
     print()
     
     try:

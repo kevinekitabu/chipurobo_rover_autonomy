@@ -1,0 +1,41 @@
+# ChipuRobot Development Configuration
+# Settings for development and testing
+
+[robot]
+# Physical dimensions
+wheel_diameter = 4.0  # inches
+wheel_base = 12.0     # inches
+robot_length = 12.0   # inches  
+robot_width = 10.0    # inches
+
+# Motor settings
+max_speed = 2.0       # ft/s (reduced for testing)
+max_acceleration = 1.5 # ft/s²
+pwm_frequency = 1000  # Hz
+
+# Encoder settings
+encoder_ppr = 11      # pulses per revolution
+encoder_enabled = true
+
+# Sensor settings
+imu_enabled = true
+vision_enabled = false  # Disabled for dev
+camera_resolution = [640, 480]
+
+[field]
+# Smaller test field
+width = 8.0    # feet
+height = 6.0   # feet
+scale = 60     # pixels per foot
+
+[server]
+host = "localhost"
+port = 5001
+debug = true
+data_dir = "dev_data"
+
+[logging]
+level = "DEBUG"
+file = "logs/chipurobo_dev.log"
+max_size = "5MB"
+backup_count = 3
