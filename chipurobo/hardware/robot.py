@@ -7,13 +7,16 @@ Unified robot class that orchestrates all hardware components
 import time
 import math
 import threading
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from .gpio_manager import GPIOPinManager
 from .motors import L298NMotorDriver
 from .encoders import MotorEncoder
 from ..sensors.imu import MPU9255_IMU
 from ..vision.camera import VisionPositioning
+from ..control.navigation import NavigationController
+from ..control.trajectory import TrajectoryPlanner
+from ..control.obstacle_avoidance import ObstacleAvoidanceSystem
 
 # Core imports with error handling
 try:
@@ -68,6 +71,11 @@ class ChipuRobot:
         # Initialize vision system
         self.vision = VisionPositioning()
         
+        # Initialize advanced control systems
+        self.navigation_controller = NavigationController(self.config)
+        self.trajectory_planner = TrajectoryPlanner(self.config)
+        self.obstacle_avoidance = ObstacleAvoidanceSystem(self.config)
+        
         # Robot state
         self.position = {'x': 0.0, 'y': 0.0, 'heading': 0.0}
         self.position_confidence = {
@@ -75,6 +83,11 @@ class ChipuRobot:
             'imu': 1.0, 
             'vision': 0.0
         }
+        
+        # Mission state
+        self.current_trajectory = None
+        self.mission_start_time = None
+        self.autonomous_mode = False
         
         # Thread for position updates
         self.position_thread = None
@@ -91,6 +104,10 @@ class ChipuRobot:
         print(f"   📏 Right Encoder: {'✅ Active' if self.right_encoder.active or not RPI_AVAILABLE else '❌ Failed'}")
         print(f"   🧭 IMU: {'✅ Active' if self.imu.available or not RPI_AVAILABLE else '❌ Failed'}")
         print(f"   📷 Vision: {'✅ Active' if self.vision.available or not RPI_AVAILABLE else '❌ Failed'}")
+        print("🎯 Advanced Control Systems:")
+        print(f"   🧭 Navigation Controller: ✅ Active")
+        print(f"   📊 Trajectory Planner: ✅ Active")
+        print(f"   🛡️ Obstacle Avoidance: ✅ Active")
     
     def start_position_tracking(self) -> None:
         """Start background thread for position tracking"""
@@ -237,15 +254,16 @@ class ChipuRobot:
     
     def execute_mission(self, mission_data: Dict[str, Any]) -> None:
         """
-        Execute a mission from the web interface
+        Execute a mission using advanced trajectory planning and navigation
         
         Args:
             mission_data: Mission configuration from server
         """
-        print(f"🎯 Executing mission: {mission_data.get('missionId', 'Unnamed')}")
+        print(f"🎯 Executing advanced mission: {mission_data.get('missionId', 'Unnamed')}")
         
         waypoints = mission_data.get('path', {}).get('waypoints', [])
         robot_config = mission_data.get('robotConfig', {})
+        use_advanced_navigation = mission_data.get('useAdvancedNavigation', True)
         
         # Update robot config
         for key, value in robot_config.items():
@@ -255,18 +273,158 @@ class ChipuRobot:
         self.start_position_tracking()
         
         try:
-            for i, waypoint in enumerate(waypoints):
-                print(f"📍 Moving to waypoint {i+1}: ({waypoint['x']:.2f}, {waypoint['y']:.2f})")
-                self.move_to_waypoint(waypoint)
-                
-                # Small pause between waypoints
-                time.sleep(0.5)
+            if use_advanced_navigation and len(waypoints) > 1:
+                self.execute_advanced_mission(waypoints)
+            else:
+                self.execute_basic_mission(waypoints)
                 
         except Exception as e:
             print(f"❌ Mission execution error: {e}")
         finally:
             self.stop()
+            self.autonomous_mode = False
             print("✅ Mission complete")
+    
+    def execute_advanced_mission(self, waypoints: List[Dict[str, float]]) -> None:
+        """
+        Execute mission using advanced trajectory planning and navigation
+        
+        Args:
+            waypoints: List of waypoints to navigate through
+        """
+        print("🚀 Starting advanced autonomous navigation")
+        
+        # Generate smooth trajectory
+        print("📊 Generating trajectory...")
+        trajectory = self.trajectory_planner.generate_trajectory(waypoints)
+        self.current_trajectory = trajectory
+        
+        # Set navigation controller path
+        self.navigation_controller.set_path(waypoints)
+        
+        # Enable autonomous mode
+        self.autonomous_mode = True
+        self.mission_start_time = time.time()
+        
+        # Main navigation loop
+        control_frequency = 20  # Hz
+        loop_time = 1.0 / control_frequency
+        
+        while not self.navigation_controller.is_path_complete() and self.autonomous_mode:
+            loop_start = time.time()
+            
+            # Update systems with current position
+            current_position = self.get_position()
+            self.navigation_controller.update_position(current_position)
+            
+            # Update obstacle avoidance with sensor data
+            sensor_data = self.get_sensor_data()
+            self.obstacle_avoidance.update_sensor_data(sensor_data)
+            
+            # Calculate navigation control output
+            forward_speed, turn_rate = self.navigation_controller.calculate_control_output()
+            
+            # Apply obstacle avoidance if obstacles detected
+            if self.obstacle_avoidance.current_obstacles:
+                target_waypoint = self.navigation_controller.target_waypoint
+                if target_waypoint:
+                    forward_speed, turn_rate = self.obstacle_avoidance.calculate_avoidance_control(
+                        current_position, target_waypoint, forward_speed, turn_rate
+                    )
+            
+            # Apply control output
+            self.drive_arcade(forward_speed, turn_rate)
+            
+            # Status update
+            if int(time.time()) % 2 == 0:  # Every 2 seconds
+                nav_status = self.navigation_controller.get_navigation_status()
+                obstacle_status = self.obstacle_avoidance.get_obstacle_status()
+                print(f"📍 Waypoint {nav_status['current_waypoint_index'] + 1}/"
+                      f"{nav_status['total_waypoints']}, "
+                      f"Obstacles: {obstacle_status['num_obstacles']}")
+            
+            # Maintain loop frequency
+            elapsed = time.time() - loop_start
+            if elapsed < loop_time:
+                time.sleep(loop_time - elapsed)
+        
+        print("🏁 Advanced navigation complete")
+    
+    def execute_basic_mission(self, waypoints: List[Dict[str, float]]) -> None:
+        """
+        Execute mission using basic waypoint navigation (fallback)
+        
+        Args:
+            waypoints: List of waypoints to navigate through
+        """
+        print("🎯 Starting basic waypoint navigation")
+        
+        for i, waypoint in enumerate(waypoints):
+            print(f"📍 Moving to waypoint {i+1}: ({waypoint['x']:.2f}, {waypoint['y']:.2f})")
+            self.move_to_waypoint(waypoint)
+            
+            # Small pause between waypoints
+            time.sleep(0.5)
+    
+    def execute_trajectory_following(self, target_time: float = None) -> None:
+        """
+        Execute trajectory following with time optimization
+        
+        Args:
+            target_time: Optional target completion time for optimization
+        """
+        if not self.current_trajectory:
+            print("❌ No trajectory available")
+            return
+        
+        print("📊 Starting trajectory following")
+        
+        trajectory = self.current_trajectory
+        if target_time:
+            print(f"⏱️ Optimizing for target time: {target_time}s")
+            trajectory = self.trajectory_planner.optimize_trajectory_for_time(
+                trajectory['waypoints'], target_time
+            )
+        
+        # Execute timed trajectory
+        start_time = time.time()
+        
+        while True:
+            elapsed_time = time.time() - start_time
+            
+            # Get target point at current time
+            target_point = self.trajectory_planner.get_trajectory_point_at_time(
+                trajectory, elapsed_time
+            )
+            
+            if not target_point:
+                break
+            
+            # Navigate to target point
+            current_position = self.get_position()
+            
+            # Calculate errors and control
+            dx = target_point['x'] - current_position['x']
+            dy = target_point['y'] - current_position['y']
+            distance_error = math.sqrt(dx*dx + dy*dy)
+            
+            target_heading = math.degrees(math.atan2(dy, dx))
+            heading_error = target_heading - current_position['heading']
+            
+            # Normalize heading error
+            while heading_error > 180:
+                heading_error -= 360
+            while heading_error < -180:
+                heading_error += 360
+            
+            # Simple proportional control
+            forward_speed = min(1.0, distance_error * 0.5)
+            turn_rate = max(-1.0, min(1.0, heading_error / 90.0))
+            
+            self.drive_arcade(forward_speed, turn_rate)
+            time.sleep(0.05)  # 20Hz control
+        
+        print("✅ Trajectory following complete")
     
     def move_to_waypoint(self, waypoint: Dict[str, float]) -> None:
         """
@@ -347,19 +505,130 @@ class ChipuRobot:
         print("✅ Sensor calibration complete")
         return results
     
+    def stop_autonomous_mission(self) -> None:
+        """Stop current autonomous mission"""
+        self.autonomous_mode = False
+        self.stop()
+        print("⏹️ Autonomous mission stopped")
+    
+    def get_advanced_navigation_status(self) -> Dict[str, Any]:
+        """Get comprehensive navigation system status"""
+        nav_status = self.navigation_controller.get_navigation_status()
+        obstacle_status = self.obstacle_avoidance.get_obstacle_status()
+        
+        trajectory_stats = {}
+        if self.current_trajectory:
+            trajectory_stats = self.trajectory_planner.get_trajectory_statistics(
+                self.current_trajectory
+            )
+        
+        return {
+            'navigation': nav_status,
+            'obstacles': obstacle_status,
+            'trajectory': trajectory_stats,
+            'autonomous_mode': self.autonomous_mode,
+            'mission_elapsed_time': (
+                time.time() - self.mission_start_time 
+                if self.mission_start_time else 0
+            )
+        }
+    
+    def plan_optimal_path(self, waypoints: List[Dict[str, float]], 
+                         constraints: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Plan optimal trajectory for given waypoints
+        
+        Args:
+            waypoints: Target waypoints
+            constraints: Optional trajectory constraints
+            
+        Returns:
+            Planned trajectory with statistics
+        """
+        print(f"🗺️ Planning optimal path through {len(waypoints)} waypoints")
+        
+        trajectory = self.trajectory_planner.generate_trajectory(waypoints, constraints)
+        stats = self.trajectory_planner.get_trajectory_statistics(trajectory)
+        
+        print(f"✅ Path planned: {stats['total_distance']:.2f}ft in {stats['total_time']:.2f}s")
+        
+        return {
+            'trajectory': trajectory,
+            'statistics': stats,
+            'feasible': stats['max_velocity'] <= self.config.get('maxVelocity', 3.0)
+        }
+    
+    def test_obstacle_avoidance(self) -> None:
+        """Test obstacle avoidance system with simulated obstacles"""
+        print("🧪 Testing obstacle avoidance system")
+        
+        # Simulate obstacles
+        test_sensor_data = {
+            'ultrasonic': {
+                'front': 2.0,
+                'front_left': float('inf'),
+                'front_right': 1.5,
+                'left': float('inf'),
+                'right': float('inf')
+            }
+        }
+        
+        self.obstacle_avoidance.update_sensor_data(test_sensor_data)
+        
+        current_pos = self.get_position()
+        target_pos = {'x': current_pos['x'] + 5.0, 'y': current_pos['y']}
+        
+        # Test avoidance calculation
+        forward_speed, turn_rate = self.obstacle_avoidance.calculate_avoidance_control(
+            current_pos, target_pos, 0.5, 0.0
+        )
+        
+        print(f"🛡️ Avoidance test - Modified control: forward={forward_speed:.2f}, turn={turn_rate:.2f}")
+        
+        # Test path clearance
+        path_clear = self.obstacle_avoidance.is_path_clear(current_pos, target_pos)
+        print(f"🛤️ Path clear: {path_clear}")
+        
+        # Reset obstacle data
+        self.obstacle_avoidance.reset_obstacle_tracking()
+        print("✅ Obstacle avoidance test complete")
+    
+    def emergency_stop(self) -> None:
+        """Emergency stop - immediately halt all systems"""
+        print("🚨 EMERGENCY STOP ACTIVATED")
+        
+        self.autonomous_mode = False
+        self.stop()
+        
+        # Reset navigation systems
+        self.navigation_controller.reset_navigation()
+        self.obstacle_avoidance.reset_obstacle_tracking()
+        
+        print("🛑 All systems halted")
+    
     def cleanup(self) -> None:
         """Clean up all hardware resources"""
         print("🧹 Cleaning up ChipuRobot...")
         
+        # Stop autonomous operations
+        self.autonomous_mode = False
         self.stop_position_tracking()
         self.stop()
         
+        # Reset advanced control systems
+        if hasattr(self, 'navigation_controller'):
+            self.navigation_controller.reset_navigation()
+        if hasattr(self, 'obstacle_avoidance'):
+            self.obstacle_avoidance.reset_obstacle_tracking()
+        
+        # Cleanup hardware
         self.motor_driver.cleanup()
         self.left_encoder.cleanup()
         self.right_encoder.cleanup()
         self.vision.cleanup()
         
         if RPI_AVAILABLE:
+            import RPi.GPIO as GPIO
             GPIO.cleanup()
         
         print("✅ ChipuRobot cleanup complete")

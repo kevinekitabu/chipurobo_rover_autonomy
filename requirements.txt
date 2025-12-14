@@ -6,3 +6,4 @@ adafruit-circuitpython-mpu6050
 opencv-python
 picamera2
 numpy
+scipy>=1.7.0
