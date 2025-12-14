@@ -209,7 +209,6 @@ http://raspberrypi.local:5001
 
 ### 🔗 Beyond Competition
 - **University Pathways** - Enhanced applications for engineering programs
-- **Industry Connections** - Links to Kenya's tech and manufacturing sectors  
 - **Continued Learning** - Foundation for advanced robotics and AI studies
 - **Entrepreneurship** - Skills for Kenya's startup and innovation ecosystem
 - **Regional Leadership** - Positioning Kenya as East Africa's STEM education hub
