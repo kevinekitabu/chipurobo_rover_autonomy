@@ -1,225 +1,352 @@
-# ChipuRobo - Kenya Science & Engineering Fair 2026 Project
+# ChipuRobot v0.5 - Computer Vision Autonomous Rover
 
-![ChipuRobo](https://img.shields.io/badge/ChipuRobo-KSEF_2026-blue) ![Platform](https://img.shields.io/badge/Platform-Raspberry_Pi-green) ![Competition](https://img.shields.io/badge/Competition-CEMASTEA_Judged-orange) ![Curriculum](https://img.shields.io/badge/Training-40%2B_Hours-red)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![OpenCV](https://img.shields.io/badge/OpenCV-4.8+-green.svg)](https://opencv.org/)
+[![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-5-red.svg)](https://www.raspberrypi.org/)
 
-**Official 2026 project for Kenya Science and Engineering Fair Scientific Exploration Track.** A comprehensive robotics education platform combining digital fabrication, electronics assembly, and autonomous programming. Participating schools receive **direct entry to KSEF nationals** with judging by CEMASTEA experts.
+**Built for Kenya Science & Engineering Fair (KSEF) 2025**
 
-## � Educational Platform Overview
+An educational autonomous robot that demonstrates computer vision-driven decision making. ChipuRobot v0.5 uses its camera as the primary sensor to perceive the environment and make intelligent movement decisions in real-time.
 
-**ChipuRobo** provides a complete 40+ hour curriculum that takes students from digital design through advanced autonomous programming. Students design, fabricate, assemble, and program their own competition-ready robots.
+## 🎯 Project Overview
 
-### 📚 4-Module Curriculum Structure
+**Core Concept**: Computer Vision → Intelligence → Movement
 
-| Module | Focus Area | Duration | Key Skills |
-|--------|------------|----------|------------|
-| **1. 3D Printing & CAD** | Digital fabrication and design | 8 hours | Fusion 360, design thinking, manufacturing |
-| **2. Laser Cutting & 2D Design** | Precision manufacturing | 6 hours | Vector design, material science, tolerances |
-| **3. Electronics & Hardware** | Circuit assembly and integration | 10 hours | Soldering, wiring, system integration |
-| **4. Programming & Autonomy** | Software development and AI | 16+ hours | Python, algorithms, computer vision |
+ChipuRobot v0.5 showcases how artificial intelligence can control robot behavior through visual perception alone, making it perfect for educational demonstrations and science fair presentations.
 
-### 🎯 Learning Outcomes
-- **Design & Fabricate** custom robot chassis using professional CAD tools
-- **Assemble & Wire** complex electronic systems safely and professionally  
-- **Program Autonomous Behaviors** using industry-standard practices
-- **Compete** in FIRST Robotics-style challenges with confidence
-- **Collaborate** effectively in technical teams
+### Key Features
+- 🔍 **Computer Vision Navigation**: Uses camera vision for obstacle avoidance
+- 🎯 **Object Following**: Tracks and follows colored objects or people
+- 🤖 **Real-Time Decisions**: 5Hz vision processing for responsive behavior
+- 🎮 **Manual Override**: Instant switch between autonomous and manual control
+- 🔧 **Simulation Mode**: Full functionality without hardware for development
 
-## 🏗️ Technical Implementation Structure
+## 🚀 Quick Start
 
-```
-chipurobo_rover_autonomy/
-├── chipurobo/                 # Main Python package
-│   ├── hardware/             # Hardware control modules
-│   │   ├── gpio_manager.py   # GPIO pin management
-│   │   ├── motors.py         # L298N motor driver
-│   │   ├── encoders.py       # Motor encoder interface
-│   │   └── robot.py          # Main robot class
-│   ├── sensors/              # Sensor interfaces
-│   │   └── imu.py           # MPU9255 IMU
-│   ├── vision/              # Computer vision
-│   │   └── camera.py        # Pi Camera + ArUco
-│   ├── control/             # Navigation & control
-│   ├── mission/             # Mission planning
-│   └── utils/               # Utilities
-│       ├── config_manager.py # Configuration management
-│       └── logger.py        # Professional logging
-├── server/                  # Mission control server
-│   └── app.py              # Flask backend API
-├── web/                    # Web interface
-│   ├── templates/          # HTML templates
-│   │   └── mission_control.html # Web-based mission control
-│   └── static/            # CSS, JS, images
-├── tools/                 # Development utilities
-│   └── path_editor.py    # GUI path planning tool
-├── scripts/               # Entry point scripts
-│   ├── run_robot.py      # Robot control script
-│   ├── run_server.py     # Server launcher
-│   └── deploy_to_pi.py   # Raspberry Pi deployment
-├── config/               # Configuration files
-│   ├── production.toml   # Production settings
-│   └── development.toml  # Development settings
-├── deploy/               # Deployment assets
-│   └── pathplanner/     # Path planning data
-│       ├── navgrid.json
-│       ├── autos/
-│       └── paths/
-├── tests/               # Unit tests
-├── docs/               # Documentation
-├── requirements.txt    # Python dependencies
-└── README.md          # This file
-```
+### Prerequisites
+- Python 3.8+
+- Raspberry Pi 5 (for hardware deployment)
+- Raspberry Pi AI Camera
+- Motor driver and DC motors
 
-## 🚀 Educational Features & Benefits
-
-### 🎯 Real-World Skills Development
-✅ **Professional CAD Design** - Industry-standard Fusion 360 workflows  
-✅ **Manufacturing Experience** - 3D printing and laser cutting optimization  
-✅ **Electronics Assembly** - Professional soldering and wiring techniques  
-✅ **Software Engineering** - Version control, testing, and documentation  
-✅ **Project Management** - Portfolio development and team collaboration  
-
-### 🔧 Hardware Platform
-- **L298N Motor Driver** - Professional DC motor control with PWM via gpiozero
-- **Hall Effect Encoders** - Built-in motor encoders for precise positioning
-- **MPU6050/MPU9255 IMU** - 6/9-axis motion sensing for navigation
-- **Raspberry Pi Camera** - Computer vision with OpenCV and ArUco detection
-- **Raspberry Pi Zero 2 W/Pi 5** - Scalable computing platform
-- **gpiozero Library** - Modern, Pythonic GPIO control (no root required)
-
-### 💻 Professional Software Architecture
-- **Modular Design** - Clean separation of hardware, sensors, vision, and control
-- **Type Hints & Documentation** - Professional Python development practices
-- **Comprehensive Testing** - Unit tests and hardware-in-the-loop validation
-- **Version Control Integration** - Git workflows and collaborative development
-- **Configuration Management** - TOML-based settings for different environments
-
-## 🛠️ GPIO Pin Assignment (Conflict-Free)
-
-```
-Left Motor:   PWM=18, IN1=24, IN2=23
-Right Motor:  PWM=12, IN1=22, IN2=27
-Left Encoder: A=5, B=6
-Right Encoder: A=13, B=19
-IMU I2C:      SDA=2, SCL=3
-Camera:       CSI Interface
-```
-
-**Using gpiozero Library** - Modern, Pythonic GPIO interface for Raspberry Pi
-
-## � Kenya Science & Engineering Fair 2026
-
-### 🎯 Competition Benefits
-- **Direct Entry to Nationals** - Participating schools automatically qualify for KSEF nationals
-- **CEMASTEA Judging** - Evaluation by Kenya's top STEM education experts
-- **Scientific Exploration Track** - Focus on research, innovation, and technical excellence
-- **National Recognition** - Platform for showcasing student achievements
-
-### 🏫 For Schools & Teachers
-
-#### 📋 Program Structure
-- **Beginner Friendly** - No prior robotics experience required
-- **Age Range** - Secondary school students (Forms 1-4)
-- **Class Size** - Optimized for 20-30 students working in teams
-- **Duration** - Full academic year preparation with weekly training sessions
-
-#### 📚 Teacher Support
-- **Virtual Training Sessions** - Weekly online sessions leading up to nationals
-- **Technical Support** - Ongoing assistance throughout the program
-- **Curriculum Materials** - Complete lesson plans and assessment guides
-- **Competition Preparation** - Structured pathway to KSEF nationals
-
-### 💰 Program Packages (2026 Pricing)
-
-#### **Entry Level Package - KES 85,000**
-**Perfect for schools starting their robotics journey**
-```
-✅ Complete hardware kit for one robot team
-✅ All electronic components and sensors
-✅ Raspberry Pi with pre-configured software
-✅ Weekly virtual training sessions for teachers
-✅ Technical support throughout the program
-✅ KSEF competition registration and guidance
-✅ Direct qualification pathway to nationals
-```
-
-#### **Center of Excellence Package - KES 500,000** 
-**One-time investment for sustained robotics programs**
-```
-✅ Everything in Entry Level Package
-✅ 2 x Bambu Lab 3D Printers for manufacturing
-✅ Complete makerspace setup with tools
-✅ Hardware kits for multiple teams
-✅ Multi-year project sustainability
-✅ Priority technical support and training
-✅ Annual project updates and new challenges
-```
-
-### 🔄 Program Continuity
-- **Annual Projects** - New challenges each year for sustained engagement
-- **2026 Focus** - ChipuRobo autonomous navigation and AI
-- **Future Years** - Evolving projects building on established hardware base
-- **Skill Progression** - Students advance from basic to advanced robotics concepts
-
-## ⚡ Quick Start (Technical Implementation)
-
-### 1. Clone and Setup
+### Installation
 ```bash
 git clone https://github.com/kevinekitabu/chipurobo_rover_autonomy.git
 cd chipurobo_rover_autonomy
 pip install -r requirements.txt
 ```
 
-### 2. Deploy to Raspberry Pi
+### Run Examples
 ```bash
-# Deploy complete system to Pi
-python scripts/deploy_to_pi.py raspberrypi.local
+# Easy way (recommended)
+./run.sh test          # System test
+./run.sh demo          # Quick demo  
+./run.sh interactive   # Interactive control
+./run.sh ksef          # KSEF presentation
 
-# Or manually on Pi:
-python scripts/run_server.py --config config/production.toml
+# Direct Python (set PYTHONPATH=. first)
+PYTHONPATH=. python3 scripts/test_system.py
+PYTHONPATH=. python3 examples/quick_demo.py
+PYTHONPATH=. python3 scripts/main.py
+PYTHONPATH=. python3 scripts/ksef_demo.py
 ```
 
-### 3. Access Mission Control
-```bash
-# Open web interface at:
-http://raspberrypi.local:5001
-# or http://localhost:5001
+## 🧠 Autonomous Modes
+
+### 1. Vision-Based Obstacle Avoidance
+```
+Camera Input → Edge Detection → Decision Logic → Motor Command
+```
+- **Forward**: Path is clear
+- **Turn Left**: Obstacle on right or ahead with left path clear
+- **Turn Right**: Obstacle on left or ahead with right path clear  
+- **Stop**: Obstacles everywhere or processing error
+
+### 2. Vision-Based Object Following  
+```
+Camera Input → Color/Object Detection → Tracking Logic → Motor Command
+```
+- **Turn Left**: Target object on left side of camera
+- **Turn Right**: Target object on right side of camera
+- **Forward**: Target centered and far away
+- **Stop**: Target centered and close (mission complete)
+
+## 🏗️ Project Structure
+
+```
+chipurobo_rover_autonomy/
+├── README.md                    # This file
+├── requirements.txt             # Python dependencies
+├── .gitignore                  # Git ignore rules
+│
+├── chipurobo/                  # Main robot package
+│   ├── __init__.py
+│   ├── hardware/               # Hardware control
+│   │   ├── robot.py           # Main robot class
+│   │   └── motors.py          # Motor controller
+│   ├── vision/                # Computer vision
+│   │   └── camera.py          # Vision processor
+│   └── utils/                 # Utilities
+│       ├── logger.py          # Logging system
+│       └── config_manager.py  # Configuration
+│
+├── config/                    # Configuration files
+│   └── development.toml       # Robot settings
+│
+├── scripts/                   # Executable scripts
+│   ├── main.py               # Interactive control
+│   ├── ksef_demo.py          # KSEF presentation
+│   └── test_system.py        # System tests
+│
+├── examples/                  # Example code
+│   └── quick_demo.py         # Simple demo
+│
+└── docs/                     # Documentation
+    ├── HARDWARE_GUIDE.md     # Hardware setup
+    ├── API_REFERENCE.md      # Code documentation
+    └── TROUBLESHOOTING.md    # Common issues
 ```
 
-## � Educational Outcomes & Assessment
+## 🚀 Quick Start
 
-### 🎯 Student Learning Objectives
-1. **Design Thinking** - Systematic approach to engineering problem-solving
-2. **Digital Fabrication** - CAD design, 3D printing, and laser cutting proficiency
-3. **Systems Integration** - Electronics assembly and troubleshooting skills
-4. **Software Engineering** - Professional Python development practices
-5. **Project Management** - Portfolio development and team collaboration
-6. **Competition Readiness** - FIRST Robotics Competition preparation
+### 1. Installation
+```bash
+# On Raspberry Pi 5
+git clone <repository>
+cd chipurobo_rover_autonomy
+pip install -r requirements.txt
+```
 
-### 📊 Assessment Methods
-- **Portfolio-Based Assessment** (60%) - Comprehensive project documentation
-- **Practical Demonstrations** (25%) - Live technical skill assessments  
-- **Competition Performance** (15%) - Autonomous navigation challenges
-- **Peer Collaboration** - Team-based project evaluation
+### 2. Basic Operation
+```bash
+# Interactive mode
+python3 main_v05.py
 
-### 🌍 Kenya STEM Education Impact
-- **CEMASTEA Alignment** - Directly supports Kenya's STEM education goals
-- **University Preparation** - Strong foundation for engineering programs at Kenyan universities
-- **Industry Readiness** - Skills aligned with Kenya's growing technology sector
-- **Innovation Culture** - Fostering the next generation of Kenyan innovators and entrepreneurs
+# Automated KSEF demo
+python3 ksef_demo.py
+```
 
-### 🔗 Beyond Competition
-- **University Pathways** - Enhanced applications for engineering programs
-- **Continued Learning** - Foundation for advanced robotics and AI studies
-- **Entrepreneurship** - Skills for Kenya's startup and innovation ecosystem
-- **Regional Leadership** - Positioning Kenya as East Africa's STEM education hub
+### 3. Controls
+```
+Controls in main_v05.py:
+- Enter: Start/Stop autonomous mode
+- 'o': Switch to obstacle avoidance  
+- 'f': Switch to object following
+- 'w','a','d','x': Manual forward/left/right/stop
+- 'q': Quit
+```
 
-### 📞 Get Started for KSEF 2026
+## 🎯 Educational Value
 
-**Ready to participate in Kenya's premier science competition?**
+### For KSEF Judges & Audience
+1. **Clear Cause-Effect**: Camera image → AI decision → Robot movement
+2. **No Black Box**: Simple, explainable computer vision algorithms
+3. **Real-Time Demo**: Live video processing and decision making
+4. **Scalable Concept**: Foundation for advanced robotics
 
-- **School Registration** - Contact us to register for KSEF 2026
-- **Teacher Training** - Join weekly virtual sessions starting January 2026
-- **Technical Support** - Get help throughout your robotics journey
-- **Competition Preparation** - Structured pathway to nationals success
+### Technical Learning Points
+- **Computer Vision**: Edge detection, color filtering, object tracking
+- **Decision Logic**: If-then rules based on visual input
+- **Control Systems**: Feedback loop from vision to motors
+- **Real-Time Processing**: 5Hz decision cycle for responsive behavior
 
-This platform prepares Kenyan students for excellence in the Kenya Science and Engineering Fair while building lasting STEM capabilities for the nation's future.
+## 🔧 Configuration
+
+Key settings in `config/development.toml`:
+```toml
+[robot]
+motor_speed = 0.8          # Motor speed (0.0 to 1.0)
+vision_mode = "obstacle_avoidance"  # or "object_following"
+
+[vision]
+decision_interval = 0.2    # Seconds between vision decisions
+obstacle_threshold = 0.3   # Edge density threshold for obstacles
+target_zone_width = 100    # Pixel width for "centered" target
+```
+
+## 🎬 Demo Scenarios
+
+### Scenario 1: Obstacle Course
+1. Set up boxes/barriers in random pattern
+2. Robot navigates using camera vision only
+3. Demonstrates spatial reasoning through computer vision
+
+### Scenario 2: Follow the Leader
+1. Person holds bright colored object
+2. Robot follows the object around
+3. Demonstrates target tracking and pursuit behavior
+
+## 🚧 Simulation Mode
+
+The robot runs in simulation mode for development:
+- **No Hardware Required**: Test logic on any computer
+- **Simulated Vision**: Test patterns for algorithm development  
+- **Full Functionality**: Complete code path testing
+- **Easy Debugging**: Perfect for code development
+
+## � Hardware Setup
+
+### Required Components
+- **Raspberry Pi 5** - Main computer
+- **Raspberry Pi AI Camera** - Vision sensor
+- **4× DC Motors** - Movement (wired as 2 channels)
+- **H-Bridge Motor Driver** - Motor control
+- **Power Bank** - Pi power supply
+- **3×18650 Battery Pack** - Motor power supply
+
+### Wiring
+```
+Raspberry Pi GPIO → Motor Driver
+Pin 17 → Left Motor Forward
+Pin 27 → Left Motor Backward  
+Pin 22 → Right Motor Forward
+Pin 23 → Right Motor Backward
+Pin 24 → Left Enable
+Pin 25 → Right Enable
+```
+
+See [docs/HARDWARE_GUIDE.md](docs/HARDWARE_GUIDE.md) for complete setup instructions.
+
+## 🧠 Vision Processing
+
+### Obstacle Detection Algorithm
+1. **Image Capture**: Get frame from Pi Camera at 30fps
+2. **Preprocessing**: Convert to grayscale, apply Gaussian blur
+3. **Edge Detection**: Use Canny edge detection
+4. **Region Analysis**: Divide into left/center/right sections
+5. **Density Calculation**: Count edge pixels per section
+6. **Decision Logic**: Choose movement based on obstacle density
+
+### Object Tracking Algorithm  
+1. **Color Space Conversion**: RGB to HSV for better color detection
+2. **Color Filtering**: Create mask for target color range
+3. **Contour Detection**: Find object boundaries
+4. **Centroid Calculation**: Determine object center
+5. **Position Analysis**: Compare to frame center for steering decisions
+
+## ⚙️ Configuration
+
+Edit `config/development.toml` to customize robot behavior:
+
+```toml
+[robot]
+motor_speed = 0.8              # Speed (0.0 to 1.0)
+vision_mode = "obstacle_avoidance"  # or "object_following"
+
+[vision]
+decision_interval = 0.2        # Seconds between decisions
+obstacle_threshold = 0.3       # Edge density threshold for obstacles
+target_zone_width = 100        # Pixel width for "centered" target
+
+[hardware]
+left_forward_pin = 17
+left_backward_pin = 27
+right_forward_pin = 22
+right_backward_pin = 23
+```
+
+## 🎬 Demo Scenarios
+
+### Scenario 1: Obstacle Course
+1. Set up boxes/barriers in random pattern
+2. Robot navigates using camera vision only
+3. Demonstrates spatial reasoning through computer vision
+
+### Scenario 2: Follow the Leader
+1. Person holds bright colored object
+2. Robot follows the object around
+3. Demonstrates target tracking and pursuit behavior
+
+## 🚧 Simulation Mode
+
+The robot runs in simulation mode for development:
+- **No Hardware Required**: Test logic on any computer
+- **Simulated Vision**: Test patterns for algorithm development  
+- **Full Functionality**: Complete code path testing
+- **Easy Debugging**: Perfect for code development
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**Camera not detected**:
+```bash
+# Check camera connection
+libcamera-hello --list-cameras
+
+# Verify PiCamera2 installation
+pip install picamera2
+```
+
+**Motor not responding**:
+- Check wiring connections
+- Verify GPIO pin assignments
+- Test with manual control first
+
+**Import errors**:
+```bash
+# Install missing dependencies
+pip install -r requirements.txt
+
+# Run system test
+python scripts/test_system.py
+```
+
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for complete troubleshooting guide.
+
+## 📚 Documentation
+
+- [Hardware Setup Guide](docs/HARDWARE_GUIDE.md) - Complete wiring and assembly
+- [API Reference](docs/API_REFERENCE.md) - Code documentation and examples  
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+## 📚 Code Examples
+
+### Basic Robot Usage
+```python
+from chipurobo.hardware.robot import ChipuRobot
+
+# Initialize robot
+robot = ChipuRobot()
+
+# Start autonomous obstacle avoidance
+robot.set_vision_mode('obstacle_avoidance')
+robot.start_autonomous_mode()
+
+# Let it run for 30 seconds
+time.sleep(30)
+
+# Clean shutdown
+robot.cleanup()
+```
+
+### Manual Control
+```python
+# Manual driving
+robot.manual_control('forward', duration=2.0)
+robot.manual_control('turn_left')
+robot.manual_control('stop')
+```
+
+## 🎓 Educational Impact
+
+**Perfect for Science Fairs Because:**
+- Judges can see AI making real-time decisions
+- Clear connection between input (camera) and output (movement)
+- Demonstrates practical AI application
+- Inspires follow-up questions about computer vision
+- Shows path to more advanced robotics
+
+## 📞 Support & Development
+
+Built by **Kevin Irungu** for educational robotics and KSEF 2025.
+
+**Project Goals:**
+- Inspire students to explore computer vision and robotics
+- Demonstrate practical artificial intelligence applications  
+- Provide foundation for advanced autonomous systems
+- Create engaging STEM education platform
+
+---
+
+**ChipuRobot v0.5**: *Where Computer Vision Meets Motion* 🤖👁️🚀

@@ -1,5 +1,5 @@
-"""Vision and positioning modules for ChipuRobo."""
+"""Vision system for ChipuRobot v0.5."""
 
-from .camera import VisionPositioning
+from .camera import VisionProcessor, VisionDecision
 
-__all__ = ['VisionPositioning']
+__all__ = ['VisionProcessor', 'VisionDecision']

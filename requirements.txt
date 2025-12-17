@@ -1,9 +1,20 @@
-flask>=2.0.0
-flask-cors>=3.0.0
-toml>=0.10.0
+# ChipuRobo v0.5 - Computer Vision Autonomous Rover
+# Core vision and camera requirements
+opencv-python>=4.8.0
+picamera2>=0.3.0
+numpy>=1.21.0
+
+# Hardware control (Raspberry Pi)
 gpiozero>=1.6.0
-adafruit-circuitpython-mpu6050
-opencv-python
-picamera2
-numpy
-scipy>=1.7.0
+
+# Configuration management
+toml>=0.10.0
+
+# Optional: Advanced computer vision (uncomment if using YOLO)
+# ultralytics>=8.0.0
+# torch>=1.13.0
+# torchvision>=0.14.0
+
+# Development and logging
+# flask>=2.0.0  # Only needed if running web interface
+# flask-cors>=3.0.0  # Only needed if running web interface

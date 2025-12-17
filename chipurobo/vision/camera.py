@@ -1,211 +1,336 @@
 #!/usr/bin/env python3
 """
-Vision Positioning System for ChipuRobo
-Computer vision positioning using ArUco markers and Raspberry Pi camera
+ChipuRobo v0.5 - Computer Vision Processor
+Vision-based autonomous decision making for obstacle avoidance and object following
 """
 
-
-import math
+import time
 import numpy as np
 from typing import Optional, Tuple, Dict, Any, List
+from dataclasses import dataclass
 
-# Core imports with error handling
-try:
-    from gpiozero import Device
-    RPI_AVAILABLE = True
-except ImportError:
-    RPI_AVAILABLE = False
-
-# Camera and vision imports
+# Camera and vision imports with fallback
 try:
     import cv2
-    import picamera2
-    import numpy as np
-    CAMERA_AVAILABLE = True
+    OPENCV_AVAILABLE = True
 except ImportError:
-    CAMERA_AVAILABLE = False
+    OPENCV_AVAILABLE = False
+    print("📷 OpenCV not available - vision in simulation mode")
+
+try:
+    from picamera2 import Picamera2
+    PICAMERA_AVAILABLE = True
+except ImportError:
+    PICAMERA_AVAILABLE = False
+    print("📷 PiCamera2 not available - using simulation mode")
+
+# YOLO for person detection (optional advanced feature)
+try:
+    import ultralytics
+    YOLO_AVAILABLE = True
+except ImportError:
+    YOLO_AVAILABLE = False
+    print("🤖 YOLO not available - using basic vision methods")
 
 
-class VisionPositioning:
-    """Computer vision positioning using ArUco markers and Raspberry Pi camera"""
+@dataclass
+class VisionDecision:
+    """Decision output from vision processing"""
+    action: str  # "forward", "turn_left", "turn_right", "stop"
+    confidence: float  # 0.0 to 1.0
+    reason: str  # Human-readable explanation
+    target_detected: bool = False
+    obstacle_detected: bool = False
+
+
+class VisionProcessor:
+    """
+    Computer Vision processor for ChipuRobo v0.5
+    Handles obstacle avoidance and object following using camera input
+    """
     
     def __init__(self):
+        """Initialize vision processor for autonomous behavior"""
         self.camera = None
         self.available = False
-        self.aruco_dict = None
-        self.aruco_params = None
-        self.camera_matrix = None
-        self.distortion_coeffs = None
+        self.mode = "obstacle_avoidance"  # "obstacle_avoidance" or "object_following"
         
-        if CAMERA_AVAILABLE and RPI_AVAILABLE:
-            self.setup_camera()
+        # Vision parameters
+        self.frame_width = 640
+        self.frame_height = 480
+        self.frame_center_x = self.frame_width // 2
+        self.frame_center_y = self.frame_height // 2
+        
+        # Detection thresholds
+        self.obstacle_threshold = 0.3  # Fraction of screen that triggers obstacle
+        self.target_zone_width = 100   # Pixels - center zone for "following" target
+        self.min_target_size = 1000    # Minimum pixels for valid target
+        
+        # Initialize camera
+        if PICAMERA_AVAILABLE and OPENCV_AVAILABLE:
+            self._setup_camera()
         else:
-            print("📷 Camera running in simulation mode")
+            print("📷 Vision processor running in simulation mode")
+        
+        print(f"👁️ Vision processor initialized - mode: {self.mode}")
     
-    def setup_camera(self) -> None:
-        """Initialize Pi camera and ArUco detection"""
+    def _setup_camera(self) -> None:
+        """Initialize Raspberry Pi AI Camera"""
         try:
-            self.camera = picamera2.Picamera2()
-            config = self.camera.create_still_configuration(main={"size": (640, 480)})
+            self.camera = Picamera2()
+            # Configure for real-time processing
+            config = self.camera.create_preview_configuration(
+                main={"size": (self.frame_width, self.frame_height), "format": "RGB888"}
+            )
             self.camera.configure(config)
             self.camera.start()
-            
-            # Setup ArUco detection
-            self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
-            self.aruco_params = cv2.aruco.DetectorParameters()
-            
-            # Default camera calibration (should be calibrated for each camera)
-            self.camera_matrix = np.array([
-                [640, 0, 320],
-                [0, 640, 240],
-                [0, 0, 1]
-            ], dtype=np.float32)
-            
-            self.distortion_coeffs = np.zeros((4, 1))
-            
             self.available = True
-            print("📷 Pi Camera initialized for vision positioning")
+            print("📷 Raspberry Pi AI Camera initialized")
+            time.sleep(2)  # Allow camera to warm up
         except Exception as e:
             print(f"❌ Camera setup failed: {e}")
+            self.available = False
     
     def capture_frame(self) -> Optional[np.ndarray]:
-        """Capture a single frame"""
+        """Capture a frame from the camera"""
         if not self.available:
-            return None
+            # Return simulated frame for testing
+            return self._generate_simulation_frame()
         
         try:
             frame = self.camera.capture_array()
-            return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            return frame
         except Exception as e:
             print(f"❌ Frame capture failed: {e}")
             return None
     
-    def detect_aruco_markers(self, frame: np.ndarray) -> Tuple[List, Optional[np.ndarray], List]:
-        """Detect ArUco markers in frame"""
-        if not self.available:
-            return [], None, []
+    def _generate_simulation_frame(self) -> np.ndarray:
+        """Generate simulated frame for development/testing"""
+        # Create a simple test pattern
+        frame = np.zeros((self.frame_height, self.frame_width, 3), dtype=np.uint8)
         
-        try:
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-            detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
-            corners, ids, rejected = detector.detectMarkers(gray)
-            return corners, ids, rejected
-        except Exception as e:
-            print(f"❌ ArUco detection failed: {e}")
-            return [], None, []
+        if OPENCV_AVAILABLE:
+            # Add some test patterns
+            cv2.rectangle(frame, (100, 100), (200, 200), (0, 255, 0), -1)  # Green square
+            cv2.circle(frame, (400, 300), 50, (255, 0, 0), -1)  # Red circle
+        else:
+            # Simple pattern without OpenCV
+            frame[100:200, 100:200] = [0, 255, 0]  # Green square
+            
+        return frame
     
-    def get_position_from_markers(self) -> Optional[Tuple[float, float, float]]:
-        """Get position from ArUco markers (x, y, heading)"""
-        if not self.available:
-            return None
-        
-        frame = self.capture_frame()
+    def detect_obstacles(self, frame: np.ndarray) -> VisionDecision:
+        """
+        Detect obstacles using simple computer vision
+        Returns decision for obstacle avoidance behavior
+        """
         if frame is None:
-            return None
+            return VisionDecision("stop", 0.0, "No camera frame")
         
-        corners, ids, _ = self.detect_aruco_markers(frame)
+        # Convert to grayscale for edge detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         
-        if ids is not None and len(ids) > 0:
-            # Calculate position based on marker detection
-            # This is a simplified implementation - real world would need proper calibration
-            marker_center = corners[0][0].mean(axis=0)
-            
-            # Convert pixels to field coordinates (inches)
-            # Assuming camera is mounted looking down at field
-            x_pos = (marker_center[0] - 320) / 32.0  # Convert pixels to inches
-            y_pos = (marker_center[1] - 240) / 32.0
-            
-            # Calculate heading from marker orientation
-            heading = math.atan2(
-                corners[0][0][1][1] - corners[0][0][0][1], 
-                corners[0][0][1][0] - corners[0][0][0][0]
-            )
-            
-            return (x_pos, y_pos, math.degrees(heading))
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         
-        return None
-    
-    def get_marker_pose(self, marker_id: int = None) -> Optional[Dict[str, Any]]:
-        """Get detailed pose information for a specific marker"""
-        if not self.available:
-            return None
+        # Edge detection to find obstacles
+        edges = cv2.Canny(blurred, 50, 150)
         
-        frame = self.capture_frame()
-        if frame is None:
-            return None
+        # Focus on lower half of image (ground level obstacles)
+        roi_height = frame.shape[0] // 2
+        roi = edges[roi_height:, :]
         
-        corners, ids, _ = self.detect_aruco_markers(frame)
+        # Divide frame into left, center, right sections
+        width = roi.shape[1]
+        section_width = width // 3
         
-        if ids is not None and len(ids) > 0:
-            # Find specific marker or use first one
-            marker_index = 0
-            if marker_id is not None:
-                marker_indices = np.where(ids.flatten() == marker_id)[0]
-                if len(marker_indices) == 0:
-                    return None
-                marker_index = marker_indices[0]
-            
-            # Estimate pose
-            try:
-                marker_length = 0.1  # 10cm markers
-                rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-                    [corners[marker_index]], marker_length, 
-                    self.camera_matrix, self.distortion_coeffs
+        left_section = roi[:, :section_width]
+        center_section = roi[:, section_width:2*section_width]
+        right_section = roi[:, 2*section_width:]
+        
+        # Count edge pixels in each section
+        left_edges = np.sum(left_section) / 255
+        center_edges = np.sum(center_section) / 255
+        right_edges = np.sum(right_section) / 255
+        
+        # Calculate obstacle density
+        total_pixels = section_width * roi_height
+        left_density = left_edges / total_pixels
+        center_density = center_edges / total_pixels
+        right_density = right_edges / total_pixels
+        
+        # Decision logic
+        if center_density > self.obstacle_threshold:
+            # Obstacle ahead - turn away from denser side
+            if left_density < right_density:
+                return VisionDecision(
+                    "turn_left", 
+                    0.8, 
+                    f"Obstacle ahead (density: {center_density:.2f}), less dense on left"
                 )
-                
-                return {
-                    'id': int(ids[marker_index][0]),
-                    'position': {
-                        'x': float(tvecs[0][0][0]),
-                        'y': float(tvecs[0][0][1]),
-                        'z': float(tvecs[0][0][2])
-                    },
-                    'rotation': {
-                        'x': float(rvecs[0][0][0]),
-                        'y': float(rvecs[0][0][1]),
-                        'z': float(rvecs[0][0][2])
-                    },
-                    'corners': corners[marker_index].tolist()
-                }
-            except Exception as e:
-                print(f"❌ Pose estimation failed: {e}")
-                return None
-        
-        return None
+            else:
+                return VisionDecision(
+                    "turn_right", 
+                    0.8, 
+                    f"Obstacle ahead (density: {center_density:.2f}), less dense on right"
+                )
+        elif left_density > self.obstacle_threshold:
+            return VisionDecision(
+                "turn_right", 
+                0.7, 
+                f"Obstacle on left (density: {left_density:.2f})"
+            )
+        elif right_density > self.obstacle_threshold:
+            return VisionDecision(
+                "turn_left", 
+                0.7, 
+                f"Obstacle on right (density: {right_density:.2f})"
+            )
+        else:
+            return VisionDecision(
+                "forward", 
+                0.9, 
+                f"Path clear (max density: {max(left_density, center_density, right_density):.2f})"
+            )
     
-    def save_calibration_image(self, filename: str) -> bool:
-        """Save current frame for camera calibration"""
-        if not self.available:
-            return False
-        
-        frame = self.capture_frame()
+    def detect_person_or_object(self, frame: np.ndarray) -> VisionDecision:
+        """
+        Detect person or colored object for following behavior
+        Returns decision for object following
+        """
         if frame is None:
-            return False
+            return VisionDecision("stop", 0.0, "No camera frame")
         
-        try:
-            cv2.imwrite(filename, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-            print(f"📷 Calibration image saved: {filename}")
+        # Method 1: Simple color-based tracking (for colored objects)
+        # Look for bright/colored objects that stand out
+        hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+        
+        # Define range for detecting bright objects (adjust as needed)
+        # This example looks for red objects
+        lower_red1 = np.array([0, 120, 70])
+        upper_red1 = np.array([10, 255, 255])
+        lower_red2 = np.array([170, 120, 70])
+        upper_red2 = np.array([180, 255, 255])
+        
+        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+        mask = cv2.bitwise_or(mask1, mask2)
+        
+        # Find contours
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if contours:
+            # Find largest contour (assumed to be our target)
+            largest_contour = max(contours, key=cv2.contourArea)
+            area = cv2.contourArea(largest_contour)
+            
+            if area > self.min_target_size:
+                # Calculate centroid
+                M = cv2.moments(largest_contour)
+                if M["m00"] != 0:
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
+                    
+                    # Determine action based on target position
+                    if cx < self.frame_center_x - self.target_zone_width // 2:
+                        return VisionDecision(
+                            "turn_left", 
+                            0.8, 
+                            f"Target on left (x: {cx}, area: {int(area)})",
+                            target_detected=True
+                        )
+                    elif cx > self.frame_center_x + self.target_zone_width // 2:
+                        return VisionDecision(
+                            "turn_right", 
+                            0.8, 
+                            f"Target on right (x: {cx}, area: {int(area)})",
+                            target_detected=True
+                        )
+                    else:
+                        # Target centered - move forward or stop based on size
+                        if area < 5000:  # Target far away
+                            return VisionDecision(
+                                "forward", 
+                                0.9, 
+                                f"Target centered and far (area: {int(area)})",
+                                target_detected=True
+                            )
+                        else:  # Target close
+                            return VisionDecision(
+                                "stop", 
+                                0.9, 
+                                f"Target centered and close (area: {int(area)})",
+                                target_detected=True
+                            )
+        
+        # No target detected - search behavior
+        return VisionDecision(
+            "turn_right", 
+            0.3, 
+            "No target detected, searching...",
+            target_detected=False
+        )
+    
+    def process_frame_for_autonomy(self, frame: Optional[np.ndarray] = None) -> VisionDecision:
+        """
+        Main processing function that returns autonomous decision
+        
+        Args:
+            frame: Optional frame to process, if None captures new frame
+            
+        Returns:
+            VisionDecision with recommended action
+        """
+        if frame is None:
+            frame = self.capture_frame()
+        
+        if frame is None:
+            return VisionDecision("stop", 0.0, "Camera not available")
+        
+        # Process based on current mode
+        if self.mode == "obstacle_avoidance":
+            return self.detect_obstacles(frame)
+        elif self.mode == "object_following":
+            return self.detect_person_or_object(frame)
+        else:
+            return VisionDecision("stop", 0.0, f"Unknown mode: {self.mode}")
+    
+    def set_mode(self, mode: str) -> bool:
+        """
+        Change vision processing mode
+        
+        Args:
+            mode: "obstacle_avoidance" or "object_following"
+            
+        Returns:
+            True if mode changed successfully
+        """
+        if mode in ["obstacle_avoidance", "object_following"]:
+            self.mode = mode
+            print(f"👁️ Vision mode changed to: {mode}")
             return True
-        except Exception as e:
-            print(f"❌ Failed to save calibration image: {e}")
+        else:
+            print(f"❌ Unknown vision mode: {mode}")
             return False
     
     def get_status(self) -> Dict[str, Any]:
-        """Get vision system status"""
+        """Get current vision processor status"""
         return {
-            'available': self.available,
-            'rpi_available': RPI_AVAILABLE,
-            'camera_library_available': CAMERA_AVAILABLE,
-            'aruco_dict': 'DICT_6X6_250' if self.aruco_dict is not None else None,
-            'camera_resolution': (640, 480) if self.available else None,
-            'calibrated': self.camera_matrix is not None
+            "available": self.available,
+            "mode": self.mode,
+            "camera_ready": self.camera is not None,
+            "frame_size": (self.frame_width, self.frame_height),
+            "opencv_available": OPENCV_AVAILABLE,
+            "picamera_available": PICAMERA_AVAILABLE
         }
     
-    def cleanup(self) -> None:
+    def cleanup(self):
         """Clean up camera resources"""
         if self.camera:
             try:
                 self.camera.stop()
-                print("📷 Camera cleanup completed")
-            except Exception:
-                pass
+                self.camera.close()
+                print("📷 Camera cleaned up")
+            except Exception as e:
+                print(f"⚠️ Camera cleanup error: {e}")
+    

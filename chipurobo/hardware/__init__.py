@@ -1,7 +1,6 @@
-"""Hardware control modules for ChipuRobo."""
+"""Hardware control modules for ChipuRobot v0.5."""
 
 from .robot import ChipuRobot
-from .gpio_manager import GPIOPinManager
-from .encoders import MotorEncoder
+from .motors import MotorController
 
-__all__ = ['ChipuRobot', 'GPIOPinManager', 'MotorEncoder']
+__all__ = ['ChipuRobot', 'MotorController']

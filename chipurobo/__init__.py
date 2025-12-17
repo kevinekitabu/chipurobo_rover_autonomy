@@ -1,25 +1,24 @@
 """
-ChipuRobo - Autonomous Robot Control System
-==========================================
+ChipuRobo v0.5 - Computer Vision Autonomous Rover
+=================================================
 
-A professional robotics framework for autonomous navigation and mission control.
+A computer vision-focused autonomous robot for educational demonstrations.
+Built for Kenya Science & Engineering Fair (KSEF) 2025.
 
 Components:
-- Hardware: Motor drivers, sensors, GPIO management
-- Control: Navigation, path planning, autonomous driving
-- Mission: Mission planning and execution system  
-- Vision: Computer vision and positioning
-- Web: Mission control interface
-- Server: Backend API and robot communication
+- Hardware: Motor control, differential drive
+- Vision: Computer vision processing for autonomous decisions
+- Utils: Configuration and logging utilities
+
+Focus: Computer Vision → Intelligence → Movement
 
 Author: Kevin Irungu
 License: MIT
 """
 
-__version__ = "1.0.0"
+__version__ = "0.5.0"
 __author__ = "Kevin Irungu"
 
 from chipurobo.hardware.robot import ChipuRobot
-from chipurobo.hardware.gpio_manager import GPIOPinManager
 
-__all__ = ['ChipuRobot', 'GPIOPinManager']
+__all__ = ['ChipuRobot']

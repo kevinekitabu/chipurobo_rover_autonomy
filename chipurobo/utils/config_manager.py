@@ -234,3 +234,36 @@ def reload_config(config_path: Optional[str] = None) -> ConfigManager:
     global _config_instance
     _config_instance = ConfigManager(config_path)
     return _config_instance
+
+
+def load_config(config_name: str = "development") -> Dict[str, Any]:
+    """
+    Load configuration by name (standalone function)
+    
+    Args:
+        config_name: Name of config file (without .toml extension)
+        
+    Returns:
+        Configuration dictionary
+    """
+    project_root = Path(__file__).parent.parent.parent
+    config_dir = project_root / "config"
+    config_file = config_dir / f"{config_name}.toml"
+    
+    if not config_file.exists():
+        print(f"⚠️ Config file not found: {config_file}")
+        return {}
+    
+    if not TOML_AVAILABLE:
+        print("⚠️ TOML library not available")
+        return {}
+    
+    try:
+        with open(config_file, 'r') as f:
+            config_data = toml.load(f)
+        print(f"📄 Loading {config_name} configuration")
+        print(f"✅ Configuration loaded from: {config_file}")
+        return config_data
+    except Exception as e:
+        print(f"❌ Failed to load config {config_file}: {e}")
+        return {}

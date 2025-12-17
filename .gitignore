@@ -1,7 +1,8 @@
 # ChipuRobo Project .gitignore
 
-# Curriculum - Keep private/local only
-curriculum/
+# Logs and runtime files
+logs/
+*.log
 
 # Python
 __pycache__/
