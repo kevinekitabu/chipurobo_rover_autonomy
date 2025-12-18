@@ -335,6 +335,261 @@ class VisionProcessor:
             target_detected=False
         )
     
+    def enhanced_person_detection(self, frame: np.ndarray, request=None) -> VisionDecision:
+        """
+        Enhanced person detection and following with sophisticated behavior
+        Combines AI detection with computer vision for robust person tracking
+        """
+        if frame is None:
+            return VisionDecision("stop", 0.0, "No camera frame")
+        
+        # Try AI detection first if available
+        if self.ai_enabled and self.imx500 and request:
+            ai_result = self._ai_person_detection(request, frame)
+            if ai_result.target_detected:
+                return ai_result
+        
+        # Fallback to advanced computer vision person detection
+        return self._cv_person_detection(frame)
+    
+    def _ai_person_detection(self, request, frame: np.ndarray) -> VisionDecision:
+        """AI-powered person detection using IMX500"""
+        try:
+            outputs = self.imx500.get_outputs(request.get_metadata())
+            if not outputs:
+                return VisionDecision("stop", 0.0, "No AI inference data")
+            
+            boxes, scores, classes = outputs[0][0], outputs[1][0], outputs[2][0]
+            
+            # Find all person detections (class 0)
+            person_detections = []
+            for box, score, cls in zip(boxes, scores, classes):
+                if int(cls) == 0 and score > 0.5:  # Person class with good confidence
+                    obj_scaled = self.imx500.convert_inference_coords(
+                        box, request.get_metadata(), self.camera
+                    )
+                    person_detections.append({
+                        'box': obj_scaled,
+                        'confidence': score,
+                        'center_x': obj_scaled.x + obj_scaled.width // 2,
+                        'center_y': obj_scaled.y + obj_scaled.height // 2,
+                        'area': obj_scaled.width * obj_scaled.height
+                    })
+            
+            if not person_detections:
+                return VisionDecision("stop", 0.0, "No person detected", target_detected=False)
+            
+            # Select best person to follow
+            target_person = self._select_best_person_target(person_detections, frame.shape)
+            
+            # Generate following behavior
+            return self._generate_person_following_decision(target_person, frame.shape)
+            
+        except Exception as e:
+            print(f"AI person detection error: {e}")
+            return VisionDecision("stop", 0.0, f"AI detection failed: {e}")
+    
+    def _cv_person_detection(self, frame: np.ndarray) -> VisionDecision:
+        """Computer vision person detection using HOG + SVM"""
+        try:
+            # Use OpenCV's HOG person detector as fallback
+            hog = cv2.HOGDescriptor()
+            hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+            
+            # Detect people in the frame
+            boxes, weights = hog.detectMultiScale(frame, winStride=(8,8), padding=(32,32), scale=1.05)
+            
+            if len(boxes) == 0:
+                return self._person_search_behavior()
+            
+            # Convert to our detection format
+            person_detections = []
+            for i, (x, y, w, h) in enumerate(boxes):
+                person_detections.append({
+                    'box': {'x': x, 'y': y, 'width': w, 'height': h},
+                    'confidence': weights[i] if i < len(weights) else 0.5,
+                    'center_x': x + w // 2,
+                    'center_y': y + h // 2,
+                    'area': w * h
+                })
+            
+            # Select best target
+            target_person = self._select_best_person_target(person_detections, frame.shape)
+            return self._generate_person_following_decision(target_person, frame.shape)
+            
+        except Exception as e:
+            print(f"CV person detection error: {e}")
+            # Fallback to color-based detection
+            return self.detect_person_or_object(frame)
+    
+    def _select_best_person_target(self, person_detections: List[Dict], frame_shape: Tuple) -> Dict:
+        """Select the best person to follow based on multiple criteria"""
+        if len(person_detections) == 1:
+            return person_detections[0]
+        
+        frame_center_x = frame_shape[1] // 2
+        
+        # Score each person detection
+        for person in person_detections:
+            # Distance from center (lower is better)
+            center_distance = abs(person['center_x'] - frame_center_x) / frame_center_x
+            
+            # Size score (moderate size is better - not too close, not too far)
+            ideal_area = 8000  # Adjust based on testing
+            area_score = 1.0 - abs(person['area'] - ideal_area) / ideal_area
+            area_score = max(0.1, area_score)  # Minimum score
+            
+            # Confidence score
+            confidence_score = person['confidence']
+            
+            # Combined score (weighted)
+            person['follow_score'] = (
+                0.4 * (1.0 - center_distance) +  # Prefer centered
+                0.3 * area_score +               # Prefer good size
+                0.3 * confidence_score           # Prefer high confidence
+            )
+        
+        # Return person with highest score
+        return max(person_detections, key=lambda p: p['follow_score'])
+    
+    def _generate_person_following_decision(self, person: Dict, frame_shape: Tuple) -> VisionDecision:
+        """Generate movement decision for following a person"""
+        frame_center_x = frame_shape[1] // 2
+        center_x = person['center_x']
+        area = person['area']
+        confidence = person['confidence']
+        
+        # Define following zones
+        close_threshold = 15000   # Stop when person is very close
+        ideal_min_area = 4000     # Move forward when person is far
+        turn_threshold = 80       # Pixel threshold for turning
+        
+        # Horizontal positioning logic
+        x_offset = center_x - frame_center_x
+        
+        if abs(x_offset) > turn_threshold:
+            # Person not centered - turn to track
+            if x_offset < 0:
+                return VisionDecision(
+                    "turn_left", 
+                    confidence, 
+                    f"Person on left (offset: {x_offset}, area: {int(area)})",
+                    target_detected=True
+                )
+            else:
+                return VisionDecision(
+                    "turn_right", 
+                    confidence, 
+                    f"Person on right (offset: {x_offset}, area: {int(area)})",
+                    target_detected=True
+                )
+        else:
+            # Person centered - decide based on distance
+            if area > close_threshold:
+                return VisionDecision(
+                    "stop", 
+                    confidence, 
+                    f"Person close, maintaining distance (area: {int(area)})",
+                    target_detected=True
+                )
+            elif area < ideal_min_area:
+                return VisionDecision(
+                    "forward", 
+                    confidence, 
+                    f"Person far, approaching (area: {int(area)})",
+                    target_detected=True
+                )
+            else:
+                return VisionDecision(
+                    "stop", 
+                    confidence, 
+                    f"Person at ideal distance (area: {int(area)})",
+                    target_detected=True
+                )
+    
+    def _person_search_behavior(self) -> VisionDecision:
+        """Behavior when no person is detected - systematic search"""
+        current_time = time.time()
+        
+        # Implement a search pattern
+        if not hasattr(self, '_last_search_turn') or current_time - self._last_search_turn > 3.0:
+            self._search_direction = "turn_right" if not hasattr(self, '_search_direction') else (
+                "turn_left" if self._search_direction == "turn_right" else "turn_right"
+            )
+            self._last_search_turn = current_time
+        
+        return VisionDecision(
+            self._search_direction, 
+            0.3, 
+            f"Searching for person ({self._search_direction})",
+            target_detected=False
+        )
+    
+    def advanced_person_following(self, frame: np.ndarray, request=None) -> VisionDecision:
+        """
+        Advanced person following with state management and behavioral patterns
+        """
+        if not hasattr(self, '_person_following_state'):
+            self._person_following_state = {
+                'state': 'SEARCHING',  # SEARCHING, FOUND, FOLLOWING, LOST
+                'last_seen_time': 0,
+                'lost_count': 0,
+                'following_duration': 0
+            }
+        
+        state = self._person_following_state
+        current_time = time.time()
+        
+        # Get person detection
+        detection_result = self.enhanced_person_detection(frame, request)
+        
+        # State machine for person following
+        if detection_result.target_detected:
+            if state['state'] in ['SEARCHING', 'LOST']:
+                state['state'] = 'FOUND'
+                state['lost_count'] = 0
+                print(f"🎯 Person found! Switching to FOUND state")
+            
+            state['last_seen_time'] = current_time
+            
+            if state['state'] == 'FOUND':
+                state['state'] = 'FOLLOWING'
+                state['following_duration'] = 0
+                print(f"👥 Now following person")
+            
+            if state['state'] == 'FOLLOWING':
+                state['following_duration'] = current_time - state['last_seen_time'] + state['following_duration']
+            
+            return detection_result
+        
+        else:
+            # Person not detected
+            time_since_last_seen = current_time - state['last_seen_time']
+            
+            if state['state'] == 'FOLLOWING' and time_since_last_seen < 2.0:
+                # Recently lost - continue last action briefly
+                return VisionDecision(
+                    "stop", 
+                    0.2, 
+                    f"Person temporarily lost, waiting... ({time_since_last_seen:.1f}s)",
+                    target_detected=False
+                )
+            elif time_since_last_seen < 5.0:
+                # Lost but recent - search more actively
+                state['state'] = 'LOST'
+                state['lost_count'] += 1
+                return VisionDecision(
+                    "turn_left" if state['lost_count'] % 2 == 0 else "turn_right", 
+                    0.4, 
+                    f"Person lost, active search (lost {time_since_last_seen:.1f}s ago)",
+                    target_detected=False
+                )
+            else:
+                # Long time lost - return to general search
+                state['state'] = 'SEARCHING'
+                state['lost_count'] = 0
+                return self._person_search_behavior()
+    
     def ai_detect_objects(self, request) -> VisionDecision:
         """
         AI-powered object detection using IMX500 neural network
@@ -477,13 +732,14 @@ class VisionProcessor:
         }
         return coco_classes.get(class_id, f"object_{class_id}")
     
-    def process_frame_for_autonomy(self, request=None) -> VisionDecision:
+    def process_frame_for_autonomy(self, request=None, mode: str = None) -> VisionDecision:
         """
         Main processing function that returns autonomous decision
         Uses AI-powered detection when available, falls back to traditional vision
         
         Args:
             request: Camera request object (for AI processing) or None for traditional processing
+            mode: Override mode ("obstacle_avoidance", "object_following", "person_following")
             
         Returns:
             VisionDecision with recommended action
@@ -491,27 +747,34 @@ class VisionProcessor:
         if not self.available:
             return VisionDecision("stop", 0.0, "Camera not available")
         
-        # Use AI-powered processing if available and request provided
-        if self.ai_enabled and request is not None:
-            if self.mode == "obstacle_avoidance":
-                return self.ai_detect_obstacles(request)
-            elif self.mode == "object_following":
-                return self.ai_detect_objects(request)
-            else:
-                return VisionDecision("stop", 0.0, f"Unknown AI mode: {self.mode}")
+        # Use provided mode or fall back to instance mode
+        current_mode = mode or self.mode
         
-        # Fallback to traditional vision processing
+        # Get frame for processing
         frame = self.capture_frame()
         if frame is None:
             return VisionDecision("stop", 0.0, "No camera frame")
         
-        # Process based on current mode
-        if self.mode == "obstacle_avoidance":
-            return self.detect_obstacles(frame)
-        elif self.mode == "object_following":
-            return self.detect_person_or_object(frame)
-        else:
-            return VisionDecision("stop", 0.0, f"Unknown mode: {self.mode}")
+        try:
+            if current_mode == "person_following":
+                return self.advanced_person_following(frame, request)
+            elif current_mode == "obstacle_avoidance":
+                # Use AI-powered processing if available
+                if self.ai_enabled and request is not None:
+                    return self.ai_detect_obstacles(request)
+                else:
+                    return self.detect_obstacles(frame)
+            elif current_mode == "object_following":
+                # Use AI-powered processing if available
+                if self.ai_enabled and request is not None:
+                    return self.ai_detect_objects(request)
+                else:
+                    return self.detect_person_or_object(frame)
+            else:
+                return VisionDecision("stop", 0.0, f"Unknown mode: {current_mode}")
+        except Exception as e:
+            print(f"Vision processing error: {e}")
+            return VisionDecision("stop", 0.0, f"Processing error: {e}")
     
     def set_mode(self, mode: str) -> bool:
         """

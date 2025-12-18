@@ -125,16 +125,16 @@ class ChipuRobot:
                     try:
                         # Capture frame with AI processing
                         request = self.vision.camera.capture_request()
-                        decision = self.vision.process_frame_for_autonomy(request)
+                        decision = self.vision.process_frame_for_autonomy(request, mode=self.vision.mode)
                     except Exception as e:
                         print(f"⚠️ AI Camera error, using fallback: {e}")
-                        decision = self.vision.process_frame_for_autonomy()
+                        decision = self.vision.process_frame_for_autonomy(mode=self.vision.mode)
                     finally:
                         if request:
                             request.release()
                 else:
                     # Traditional vision processing
-                    decision = self.vision.process_frame_for_autonomy()
+                    decision = self.vision.process_frame_for_autonomy(mode=self.vision.mode)
                 
                 # Execute decision
                 self._execute_vision_decision(decision)
@@ -231,6 +231,83 @@ class ChipuRobot:
             "last_decision_time": self.last_decision_time
         }
     
+    def run_advanced_person_following(self, duration: int = 60):
+        """
+        Run advanced person following mode with sophisticated tracking
+        """
+        print("🤖 Starting Advanced Person Following Mode")
+        print("👥 Robot will intelligently track and follow people")
+        print(f"⏱️ Running for {duration} seconds")
+        
+        start_time = time.time()
+        last_status_time = 0
+        
+        try:
+            while time.time() - start_time < duration:
+                current_time = time.time()
+                
+                # Get camera frame with AI support
+                request = None
+                if self.vision.ai_enabled and self.vision.camera:
+                    try:
+                        request = self.vision.camera.capture_request()
+                        decision = self.vision.process_frame_for_autonomy(request, mode="person_following")
+                    except Exception as e:
+                        print(f"⚠️ AI Camera error, using fallback: {e}")
+                        decision = self.vision.process_frame_for_autonomy(mode="person_following")
+                    finally:
+                        if request:
+                            request.release()
+                else:
+                    decision = self.vision.process_frame_for_autonomy(mode="person_following")
+                
+                # Execute movement decision
+                self._execute_vision_decision(decision)
+                
+                # Status updates every 3 seconds
+                if current_time - last_status_time > 3.0:
+                    print(f"👥 Person Following: {decision.reason} (confidence: {decision.confidence:.2f})")
+                    if hasattr(self.vision, '_person_following_state'):
+                        state = self.vision._person_following_state['state']
+                        print(f"   State: {state}")
+                    last_status_time = current_time
+                
+                time.sleep(0.1)  # 10 FPS processing
+                
+        except KeyboardInterrupt:
+            print("\n⏹️ Person following stopped by user")
+        finally:
+            self.stop()
+            print("🤖 Advanced person following complete")
+    
+    def run_demo_sequence(self):
+        """Enhanced demo sequence showcasing person following"""
+        print("🎬 ChipuRobot v0.5 - Enhanced Person Following Demo")
+        print("=" * 50)
+        
+        try:
+            # Demo sequence
+            print("\n1️⃣ System Check...")
+            time.sleep(2)
+            
+            print("\n2️⃣ Obstacle Avoidance Demo (10 seconds)")
+            self.start_autonomous_mode(mode="obstacle_avoidance")
+            time.sleep(10)
+            self.stop_autonomous_mode()
+            
+            print("\n3️⃣ Advanced Person Following Demo (30 seconds)")
+            self.run_advanced_person_following(30)
+            
+            print("\n4️⃣ Search Pattern Demo (10 seconds)")
+            print("🔍 Demonstrating search behavior when no person detected")
+            self.run_advanced_person_following(10)
+            
+        except KeyboardInterrupt:
+            print("\n⏹️ Demo stopped by user")
+        finally:
+            self.stop()
+            print("\n✅ Demo sequence complete!")
+
     def cleanup(self):
         """Clean up robot resources"""
         print("🧹 Cleaning up ChipuRobot...")

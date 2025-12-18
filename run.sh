@@ -19,6 +19,7 @@ if [ $# -eq 0 ]; then
     echo "  test          - Run system tests"
     echo "  test-ai       - Test AI Camera (IMX500) specifically"
     echo "  demo          - Quick demonstration"  
+    echo "  person        - Enhanced person following demo"
     echo "  interactive   - Interactive control mode"
     echo "  ksef          - KSEF presentation demo"
     echo "  help          - Show this help"
@@ -43,6 +44,10 @@ case "$1" in
     demo)
         echo "🚀 Running quick demo..."
         run_robot examples/quick_demo.py
+        ;;
+    person)
+        echo "👥 Running enhanced person following demo..."
+        run_robot scripts/enhanced_person_demo.py
         ;;
     interactive)
         echo "🎮 Starting interactive mode..."

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ChipuRobo v0.5 - KSEF Demo Script
-Automated demo sequence for Kenya Science & Engineering Fair presentation
+ChipuRobot v0.5 - KSEF 2025 Demonstration Script  
+Enhanced with advanced person following capabilities for professional presentation
 """
 
 import sys
@@ -76,40 +76,32 @@ def demo_sequence_1_obstacle_avoidance(robot):
     print(f"\n✅ Demo 1 complete! The robot avoided obstacles using computer vision.")
 
 
-def demo_sequence_2_object_following(robot):
-    """Demo 2: Object Following"""
+def demo_sequence_2_person_following(robot):
+    """Demo 2: Enhanced Person Following"""
     print("\n" + "="*50)
-    print("🎯 DEMO 2: VISION-BASED OBJECT FOLLOWING")
+    print("👥 DEMO 2: AI-POWERED PERSON FOLLOWING")
     print("="*50)
-    print("📷 The robot detects and follows colored objects or people")
-    print("🔍 YOLO detection or color tracking identifies the target")
-    print("🧠 Decision logic: target left → turn left, target right → turn right")
-    print("📐 Target centered and far → move forward, close → stop")
+    print("🧠 The robot uses AI to detect and follow people intelligently")
+    print("📷 AI Camera (IMX500) provides real-time person detection")
+    print("🎯 Decision logic: person left → turn left, person right → turn right")
+    print("📐 Person centered and far → approach, close → maintain distance")
+    print("🔍 Lost person → intelligent search patterns")
     
-    print("\n🎨 Place a bright red object in front of the camera")
-    input("Press Enter when ready to start object following demo...")
+    print("\n👤 Stand in front of the robot camera for person detection")
+    input("Press Enter when ready to start person following demo...")
     
-    # Set object following mode
-    robot.set_vision_mode('object_following')
+    countdown(3, "Starting advanced person following...")
     
-    countdown(3, "Starting object following demo...")
-    
-    # Run for demo duration
-    robot.start_autonomous_mode()
-    
+    # Run enhanced person following
     demo_duration = 45  # 45 seconds
-    start_time = time.time()
     
-    print(f"\n🎯 Running object following for {demo_duration} seconds...")
-    print("🔴 Move the red object around - watch the robot follow!")
+    print(f"\n🎯 Running person following for {demo_duration} seconds...")
+    print("👥 Move around - watch the robot intelligently track and follow you!")
+    print("🎯 Notice how it maintains distance and searches when you hide!")
     
-    while time.time() - start_time < demo_duration:
-        remaining = demo_duration - (time.time() - start_time)
-        print(f"⏱️ Demo time remaining: {remaining:.1f}s", end='\r')
-        time.sleep(1)
+    robot.run_advanced_person_following(demo_duration)
     
-    robot.stop_autonomous_mode()
-    print(f"\n✅ Demo 2 complete! The robot followed the target using computer vision.")
+    print(f"\n✅ Demo 2 complete! The robot used AI to intelligently follow people.")
 
 
 def interactive_demo(robot):
@@ -120,7 +112,8 @@ def interactive_demo(robot):
     print("Ask questions and request demonstrations!")
     print("Available commands:")
     print("  'obs' - Obstacle avoidance demo")
-    print("  'follow' - Object following demo") 
+    print("  'person' - Enhanced person following demo") 
+    print("  'follow' - Basic object following demo")
     print("  'manual' - Manual control demonstration")
     print("  'status' - Show robot technical status")
     print("  'explain' - Explain the technology")
@@ -138,6 +131,9 @@ def interactive_demo(robot):
                 print("🚧 Obstacle avoidance active - press Enter to stop")
                 input()
                 robot.stop_autonomous_mode()
+            elif command == 'person':
+                print("👥 Enhanced person following active - press Ctrl+C to stop")
+                robot.run_advanced_person_following(60)
             elif command == 'follow':
                 robot.set_vision_mode('object_following')
                 robot.start_autonomous_mode()
@@ -222,7 +218,7 @@ def main():
         print("\n" + "="*20)
         input("Press Enter to continue to Demo 2...")
         
-        demo_sequence_2_object_following(robot)
+        demo_sequence_2_person_following(robot)
         
         print("\n" + "="*20)
         print("🎉 Structured demos complete!")
