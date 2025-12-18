@@ -15,9 +15,10 @@ An educational autonomous robot that demonstrates computer vision-driven decisio
 ChipuRobot v0.5 showcases how artificial intelligence can control robot behavior through visual perception alone, making it perfect for educational demonstrations and science fair presentations.
 
 ### Key Features
-- 🔍 **Computer Vision Navigation**: Uses camera vision for obstacle avoidance
-- 🎯 **Object Following**: Tracks and follows colored objects or people
-- 🤖 **Real-Time Decisions**: 5Hz vision processing for responsive behavior
+- 🧠 **AI-Powered Vision**: Uses Raspberry Pi AI Camera (IMX500) with neural network processing
+- 🔍 **Smart Obstacle Avoidance**: Combines edge detection with AI object recognition
+- 🎯 **Intelligent Following**: AI-powered person detection and tracking (80+ object classes)
+- ⚡ **Real-Time Performance**: 30 FPS AI inference with low-latency decisions
 - 🎮 **Manual Override**: Instant switch between autonomous and manual control
 - 🔧 **Simulation Mode**: Full functionality without hardware for development
 

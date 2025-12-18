@@ -17,6 +17,7 @@ if [ $# -eq 0 ]; then
     echo ""
     echo "Available commands:"
     echo "  test          - Run system tests"
+    echo "  test-ai       - Test AI Camera (IMX500) specifically"
     echo "  demo          - Quick demonstration"  
     echo "  interactive   - Interactive control mode"
     echo "  ksef          - KSEF presentation demo"
@@ -33,6 +34,11 @@ case "$1" in
     test)
         echo "🧪 Running system tests..."
         run_robot scripts/test_system.py
+        ;;
+    test-ai)
+        echo "🤖 Testing AI Camera (IMX500)..."
+        echo "   Checking camera detection, AI models, and inference..."
+        run_robot scripts/test_ai_camera.py
         ;;
     demo)
         echo "🚀 Running quick demo..."

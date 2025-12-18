@@ -1,14 +1,22 @@
-# ChipuRobo v0.5 - Computer Vision Autonomous Rover
-# Core vision and camera requirements
+# ChipuRobo v0.5 - Computer Vision Autonomous Rover with AI Camera (IMX500)
+
+# Core vision and AI Camera requirements
 opencv-python>=4.8.0
-picamera2>=0.3.0
+picamera2>=0.3.17  # Required for IMX500 AI Camera support
 numpy>=1.21.0
+python3-munkres>=1.1.4  # Required for IMX500 post-processing
 
 # Hardware control (Raspberry Pi)
 gpiozero>=1.6.0
 
 # Configuration management
 toml>=0.10.0
+
+# AI Camera (IMX500) system dependencies
+# Note: These require system-level installation on Raspberry Pi:
+# sudo apt install imx500-all
+# sudo apt install python3-opencv python3-munkres
+# sudo apt install imx500-tools
 
 # Optional: Advanced computer vision (uncomment if using YOLO)
 # ultralytics>=8.0.0

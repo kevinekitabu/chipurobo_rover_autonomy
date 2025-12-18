@@ -105,13 +105,30 @@ Raspberry Pi 5 GPIO → Motor Driver
    Motor B- → L298N OUT4
    ```
 
-### Step 4: Camera Setup
-1. **Connect Camera**: Use ribbon cable to Pi camera connector
-2. **Enable Camera**: Run `sudo raspi-config` → Interface Options → Camera
-3. **Test Camera**: 
+### Step 4: AI Camera Setup
+1. **Connect AI Camera**: Use ribbon cable to Pi camera connector (blue strip away from ethernet)
+2. **Install AI Camera Firmware**:
    ```bash
-   libcamera-hello --list-cameras
-   libcamera-still -o test.jpg
+   # Run automated setup (recommended)
+   ./scripts/setup_ai_camera.sh
+   
+   # OR manual installation:
+   sudo apt install imx500-all imx500-tools python3-opencv python3-munkres
+   ```
+3. **Enable Camera**: Run `sudo raspi-config` → Interface Options → Camera → Enable
+4. **Reboot**: `sudo reboot` (required for AI Camera)
+5. **Test AI Camera**: 
+   ```bash
+   # Check AI camera detection
+   rpicam-hello --list-cameras
+   
+   # Test AI object detection (should show bounding boxes)
+   rpicam-hello -t 10s --post-process-file \
+     /usr/share/rpi-camera-assets/imx500_mobilenet_ssd.json \
+     --viewfinder-width 640 --viewfinder-height 480
+   
+   # Test ChipuRobot vision system
+   ./run.sh test
    ```
 
 ## ⚙️ Software Configuration
@@ -184,14 +201,57 @@ print('Camera working!' if frame is not None else 'Camera failed!')
 - Verify power supply current capacity
 - Reduce motor speed in config
 
-### Camera Issues
-**Camera not detected**:
+### AI Camera Issues
+**AI Camera not detected**:
 ```bash
-# Check camera connection
-libcamera-hello --list-cameras
+# Check camera connection and AI firmware
+rpicam-hello --list-cameras
+# Should show IMX500 camera
 
-# Verify ribbon cable connection
+# Verify AI firmware installation
+ls /lib/firmware/imx500*
+ls /usr/share/imx500-models/
+
+# Reinstall if missing
+sudo apt install --reinstall imx500-all
+
 # Check camera enable in raspi-config
+sudo raspi-config
+```
+
+**AI models not loading**:
+```bash
+# Check model permissions
+sudo chown -R pi:pi /usr/share/imx500-models/
+
+# Verify model files exist
+ls -la /usr/share/imx500-models/*.rpk
+
+# Test model loading manually
+python3 -c "
+from picamera2.devices.imx500 import IMX500
+imx500 = IMX500('/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk')
+print('AI model loaded successfully!')
+"
+```
+
+**Slow AI performance**:
+- Ensure 5V 3A power supply (AI Camera needs stable power)
+- Check CPU temperature: `vcgencmd measure_temp`
+- Consider active cooling for sustained operation
+- Verify Pi 5 performance mode: `cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor`
+
+**AI detection not working**:
+```bash
+# Test ChipuRobot vision system
+./run.sh test
+
+# Check vision processor status
+python3 -c "
+from chipurobo.vision.camera import VisionProcessor
+vision = VisionProcessor()
+print(vision.get_status())
+"
 ```
 
 **Poor image quality**:

@@ -119,8 +119,22 @@ class ChipuRobot:
                     time.sleep(0.05)  # Small delay
                     continue
                 
-                # Get vision decision
-                decision = self.vision.process_frame_for_autonomy()
+                # Get vision decision with AI Camera support
+                request = None
+                if self.vision.ai_enabled and self.vision.camera:
+                    try:
+                        # Capture frame with AI processing
+                        request = self.vision.camera.capture_request()
+                        decision = self.vision.process_frame_for_autonomy(request)
+                    except Exception as e:
+                        print(f"⚠️ AI Camera error, using fallback: {e}")
+                        decision = self.vision.process_frame_for_autonomy()
+                    finally:
+                        if request:
+                            request.release()
+                else:
+                    # Traditional vision processing
+                    decision = self.vision.process_frame_for_autonomy()
                 
                 # Execute decision
                 self._execute_vision_decision(decision)

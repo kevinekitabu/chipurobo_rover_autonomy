@@ -1,0 +1,101 @@
+# ChipuRobot v0.5 - Raspberry Pi 5 Configuration
+# Optimized for Raspberry Pi 5 with AI Camera (IMX500)
+
+[robot]
+# Physical dimensions
+wheel_diameter = 4.0  # inches
+wheel_base = 12.0     # inches
+robot_length = 12.0   # inches  
+robot_width = 10.0    # inches
+
+# Motor settings (optimized for Pi 5 performance)
+max_speed = 3.0       # ft/s
+max_acceleration = 2.0 # ft/s²
+pwm_frequency = 2000  # Hz (higher for smoother control)
+
+# Simplified sensor configuration (computer vision only)
+encoder_enabled = false   # No encoders in v0.5
+imu_enabled = false      # No IMU in v0.5
+vision_enabled = true    # Primary sensor
+
+[camera]
+# AI Camera (IMX500) configuration
+type = "imx500"
+resolution = [640, 480]
+framerate = 30
+format = "RGB888"
+
+# AI processing settings
+ai_enabled = true
+object_detection_model = "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"
+pose_estimation_model = "/usr/share/imx500-models/imx500_network_higherhrnet_coco_pose_640x480_pp.rpk"
+detection_threshold = 0.5
+inference_roi_auto = true  # Auto-calculate ROI for optimal aspect ratio
+
+# Vision processing parameters
+obstacle_threshold = 0.3
+target_zone_width = 100
+min_target_size = 1000
+processing_threads = 2    # Pi 5 has 4 cores, use 2 for vision
+
+[autonomous]
+# Autonomous behavior settings
+default_mode = "obstacle_avoidance"  # or "object_following"
+safety_priority = true  # Always prioritize obstacle avoidance
+decision_frequency = 10  # Hz - decisions per second
+movement_timeout = 2.0   # seconds - max time for single movement
+
+[field]
+# Competition field (KSEF demo)
+width = 12.0   # feet
+height = 8.0   # feet
+scale = 60     # pixels per foot
+
+[hardware]
+# GPIO pin assignments (BCM numbering)
+motor_left_forward = 18
+motor_left_backward = 19
+motor_right_forward = 20
+motor_right_backward = 21
+enable_pin = 12
+
+# Camera settings
+camera_port = 0  # Primary camera port
+led_pin = 22     # Status LED
+
+[server]
+# Web interface settings
+host = "0.0.0.0"  # Accept connections from any IP
+port = 5000
+debug = false
+data_dir = "server/data"
+enable_cors = true
+
+[logging]
+# Logging configuration
+level = "INFO"
+file = "logs/chipurobo_pi5.log"
+max_size = "10MB"
+backup_count = 5
+console_output = true
+
+# AI Camera specific logging
+ai_performance_logging = true
+inference_timing = true
+
+[performance]
+# Pi 5 optimizations
+cpu_governor = "performance"  # Ensure maximum performance
+gpu_memory_split = 128       # MB for camera processing
+enable_overclocking = false  # Set to true for maximum performance (monitor temps)
+
+# Thermal management
+thermal_throttling_temp = 70  # °C
+cooling_fan_temp = 60        # °C (if fan installed)
+
+[safety]
+# Safety parameters
+emergency_stop_threshold = 5.0  # seconds of no decision
+collision_detection_distance = 0.5  # feet
+stuck_detection_time = 3.0     # seconds
+max_turn_time = 2.0           # seconds for single turn
